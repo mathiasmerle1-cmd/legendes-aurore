@@ -7,6 +7,7 @@
   const U = window.U, D = window.DATA, Art = window.Art;
 
   const TS = 16;
+  const MS = D.MAP_SCALE || 1;
   const W = D.WORLD_SIZE;
   const H = D.WORLD_SIZE;
   const SPECIAL_NONE = 0, SPECIAL_WATER = 1, SPECIAL_LAVA = 2, SPECIAL_BRIDGE = 3;
@@ -71,7 +72,7 @@
           let best = 0, bestD = 1e9;
           D.ZONES.forEach((z, i) => {
             // frontières organiques + attracteurs
-            const wobble = (U.fbm(x * 0.035 + i * 17, y * 0.035 - i * 11, this.seed + i * 101, 3) - 0.5) * 30;
+            const wobble = (U.fbm(x * 0.024 + i * 17, y * 0.024 - i * 11, this.seed + i * 101, 3) - 0.5) * (30 * MS);
             const dx = x - z.anchor.x, dy = y - z.anchor.y;
             const d = Math.sqrt(dx * dx + dy * dy) + wobble;
             if (d < bestD) { bestD = d; best = i; }
@@ -81,14 +82,14 @@
         }
       }
       // zones forcées autour des lieux importants
-      this.forceBiomeCircle(D.VILLAGE.x, D.VILLAGE.y, 25, 0);
-      this.forceBiomeCircle(D.FINAL_ARENA.x, D.FINAL_ARENA.y, 15, 0);
+      this.forceBiomeCircle(D.VILLAGE.x, D.VILLAGE.y, 25 * MS, 0);
+      this.forceBiomeCircle(D.FINAL_ARENA.x, D.FINAL_ARENA.y, 15 * MS, 0);
       D.ZONES.forEach((z, i) => {
-        z.arenas.forEach(a => this.forceBiomeCircle(a.x, a.y, 11, i));
+        z.arenas.forEach(a => this.forceBiomeCircle(a.x, a.y, 11 * MS, i));
       });
       D.OUTPOSTS.forEach(o => {
         const z = D.ZONE_BY_ID[o.biome];
-        if (z) this.forceBiomeCircle(o.x, o.y, 8, z.index);
+        if (z) this.forceBiomeCircle(o.x, o.y, 8 * MS, z.index);
       });
     }
 
@@ -115,14 +116,14 @@
     }
 
     protectedFromWater(tx, ty) {
-      if (U.dist2(tx, ty, D.VILLAGE.x, D.VILLAGE.y) < 24 * 24) return true;
-      if (U.dist2(tx, ty, D.FINAL_ARENA.x, D.FINAL_ARENA.y) < 14 * 14) return true;
+      if (U.dist2(tx, ty, D.VILLAGE.x, D.VILLAGE.y) < (24 * MS) * (24 * MS)) return true;
+      if (U.dist2(tx, ty, D.FINAL_ARENA.x, D.FINAL_ARENA.y) < (14 * MS) * (14 * MS)) return true;
       for (const z of D.ZONES) for (const a of z.arenas) {
-        const ar = a.kind === 'big' ? 15 : 11;
+        const ar = (a.kind === 'big' ? 15 : 11) * MS;
         if (U.dist2(tx, ty, a.x, a.y) < ar * ar) return true;
       }
       for (const o of D.OUTPOSTS) {
-        if (U.dist2(tx, ty, o.x, o.y) < 9 * 9) return true;
+        if (U.dist2(tx, ty, o.x, o.y) < (9 * MS) * (9 * MS)) return true;
       }
       return false;
     }
@@ -143,7 +144,10 @@
         { x: 148, y: 38, rx: 6, ry: 4 },      // toundra
         { x: 62, y: 202, rx: 5, ry: 3 },      // marais
         { x: 204, y: 208, rx: 4, ry: 3 }      // petit lac volcanique
-      ];
+      ].map(l => ({
+        x: l.x * MS, y: l.y * MS,
+        rx: l.rx * Math.sqrt(MS), ry: l.ry * Math.sqrt(MS)
+      }));
       for (const l of lakes) {
         for (let y = l.y - l.ry - 2; y <= l.y + l.ry + 2; y++) {
           for (let x = l.x - l.rx - 2; x <= l.x + l.rx + 2; x++) {
@@ -193,7 +197,7 @@
             bossId: a.boss, defeated: false
           });
           // éviter que les alentours immédiats soient bloqués
-          const rad = a.kind === 'big' ? 11 : 8;
+          const rad = (a.kind === 'big' ? 11 : 8) * MS;
           for (let ty = a.y - rad; ty <= a.y + rad; ty++) {
             for (let tx = a.x - rad; tx <= a.x + rad; tx++) {
               if (inBounds(tx, ty) && U.dist2(tx, ty, a.x, a.y) <= rad * rad) {
@@ -268,12 +272,16 @@
         [[164, 181], [178, 185], [188, 188], [196, 188]],
         // ruines finales
         [[116, 126], [116, 118], [116, 109], [116, 100]]
-      ];
-      routes.forEach(r => this.markPath(r, 1.05));
+      ].map(route => route.map(([x, y]) => [Math.round(x * MS), Math.round(y * MS)]));
+      routes.forEach(r => this.markPath(r, 1.18));
       // chemin autour de la place
-      for (let a = 0; a < 12; a++) {
-        const ang = a / 12 * Math.PI * 2;
-        this.stampPathPoint(Math.round(116 + Math.cos(ang) * 10), Math.round(126 + Math.sin(ang) * 10), 1.2);
+      for (let a = 0; a < 20; a++) {
+        const ang = a / 20 * Math.PI * 2;
+        this.stampPathPoint(
+          Math.round(D.VILLAGE.x + Math.cos(ang) * 13 * MS),
+          Math.round(D.VILLAGE.y + Math.sin(ang) * 13 * MS),
+          1.35
+        );
       }
     }
 
@@ -318,17 +326,21 @@
 
     isNearProtected(tx, ty, extra) {
       extra = extra || 0;
-      if (U.dist2(tx, ty, D.VILLAGE.x, D.VILLAGE.y) < (25 + extra) * (25 + extra)) return true;
-      if (U.dist2(tx, ty, D.FINAL_ARENA.x, D.FINAL_ARENA.y) < (13 + extra) * (13 + extra)) return true;
+      const vr = D.VILLAGE.r + 10 + extra;
+      if (U.dist2(tx, ty, D.VILLAGE.x, D.VILLAGE.y) < vr * vr) return true;
+      const fr = D.FINAL_ARENA.r + 9 + extra;
+      if (U.dist2(tx, ty, D.FINAL_ARENA.x, D.FINAL_ARENA.y) < fr * fr) return true;
       for (const z of D.ZONES) for (const a of z.arenas) {
-        const r = (a.kind === 'big' ? 12 : 8) + extra;
+        const r = (a.kind === 'big' ? 13 : 9) * MS + extra;
         if (U.dist2(tx, ty, a.x, a.y) < r * r) return true;
       }
       for (const o of this.outposts) {
-        if (U.dist2(tx, ty, o.tx, o.ty) < (9 + extra) * (9 + extra)) return true;
+        const r = 9 * MS + extra;
+        if (U.dist2(tx, ty, o.tx, o.ty) < r * r) return true;
       }
       for (const it of this.interactables) {
-        if (U.dist2(tx, ty, it.tx, it.ty) < (3 + extra) * (3 + extra)) return true;
+        const r = 3 * MS + extra;
+        if (U.dist2(tx, ty, it.tx, it.ty) < r * r) return true;
       }
       return false;
     }
@@ -336,7 +348,7 @@
     isSafeTile(tx, ty) {
       if (U.dist2(tx, ty, D.VILLAGE.x, D.VILLAGE.y) < D.VILLAGE.r * D.VILLAGE.r) return true;
       for (const o of this.outposts) {
-        if (U.dist2(tx, ty, o.tx, o.ty) < 9 * 9) return true;
+        if (U.dist2(tx, ty, o.tx, o.ty) < (9 * MS) * (9 * MS)) return true;
       }
       return false;
     }
@@ -346,9 +358,19 @@
     }
 
     placeVillage(rng) {
-      // sol de la place
-      this.village.img = Art.villagePlaza();
+      // Le village s'agrandit moins vite que le monde : on garde un bourg
+      // lisible d'un seul écran, entouré de campagne sauvage.
+      const S = 1.35;
+      // Les plans du village sont dessinés dans l'espace d'origine (centre 116,126).
+      const vtx = x => D.VILLAGE.x + (x - 116) * S;
+      const vty = y => D.VILLAGE.y + (y - 126) * S;
+      const vpx = x => vtx(x) * TS + 8;
+      const vpy = y => vty(y) * TS + 16;
+
+      // sol de la place, agrandi avec le village
+      this.village.img = Art.villagePlaza(1.7);
       this.village.decal = true;
+
       // bâtiments
       const addBuilding = (img, tx, ty, wid, hei, kind) => {
         const x = tx * TS + 8, y = ty * TS + 16;
@@ -359,53 +381,68 @@
           }
         }
         this.addDecor(img, x, y, { type: kind, id: kind });
-        // cheminier -> fumée
         this.emitters.push({ x: x + 17, y: y - img.height + 11, type: 'smoke', rate: 1.1, timer: rng() * 2 });
       };
-      addBuilding(Art.hall(), 116, 120, 9, 3, 'hall');
-      addBuilding(Art.shop(), 103, 126, 7, 3, 'shop');
-      addBuilding(Art.forge(), 133, 126, 7, 3, 'forge');
-      addBuilding(Art.house(0), 104, 139, 6, 3, 'house');
-      addBuilding(Art.house(1), 129, 140, 6, 3, 'house');
-      addBuilding(Art.house(2), 144, 137, 6, 3, 'house');
+      addBuilding(Art.hall(), vtx(116), vty(120), 9, 3, 'hall');
+      addBuilding(Art.shop(), vtx(103), vty(126), 7, 3, 'shop');
+      addBuilding(Art.forge(), vtx(133), vty(126), 7, 3, 'forge');
+      addBuilding(Art.house(0), vtx(104), vty(139), 6, 3, 'house');
+      addBuilding(Art.house(1), vtx(129), vty(140), 6, 3, 'house');
+      addBuilding(Art.house(2), vtx(144), vty(137), 6, 3, 'house');
+      addBuilding(Art.house(2), vtx(97), vty(116), 6, 3, 'house');
+      addBuilding(Art.house(0), vtx(139), vty(116), 6, 3, 'house');
+      // maisons du centre, de part et d'autre du hall
+      addBuilding(Art.house(1), vtx(107), vty(119), 6, 3, 'house');
+      addBuilding(Art.house(2), vtx(126), vty(118), 6, 3, 'house');
 
       // fontaine
-      const fx = 116 * TS + 8, fy = 126 * TS + 16;
+      const fx = vpx(116), fy = vpy(126);
       this.village.fountain = this.addDecor(Art.fountain(), fx, fy, { solid: true, footprint: { w: 3, h: 2, ox: -1, oy: -1 }, type: 'fountain' });
       this.emitters.push({ x: fx, y: fy - 35, type: 'sparkle', rate: 0.8, timer: 0 });
       // puits et mobilier
-      this.addDecor(Art.well(), 109 * TS + 8, 133 * TS + 16, { solid: true, footprint: { w: 2, h: 1, ox: 0, oy: 0 }, type: 'well' });
-      this.addDecor(Art.bench(), 108 * TS + 8, 128 * TS + 16, { solid: true, type: 'bench' });
-      this.addDecor(Art.bench(), 125 * TS + 8, 129 * TS + 16, { solid: true, type: 'bench' });
-      this.addDecor(Art.lamp(), 111 * TS + 8, 121 * TS + 16, { solid: true, type: 'lamp' });
-      this.addDecor(Art.lamp(), 123 * TS + 8, 121 * TS + 16, { solid: true, type: 'lamp' });
-      this.addDecor(Art.lamp(), 108 * TS + 8, 136 * TS + 16, { solid: true, type: 'lamp' });
-      this.addDecor(Art.lamp(), 136 * TS + 8, 132 * TS + 16, { solid: true, type: 'lamp' });
-      this.addDecor(Art.barrel(), 99 * TS + 8, 128 * TS + 16, { solid: true, type: 'barrel' });
-      this.addDecor(Art.crate(), 99 * TS + 8, 130 * TS + 16, { solid: true, type: 'crate' });
-      this.addDecor(Art.barrel(), 138 * TS + 8, 129 * TS + 16, { solid: true, type: 'barrel' });
-      this.addDecor(Art.anvil(), 137 * TS + 8, 127 * TS + 16, { solid: false, type: 'anvil' });
-      this.addDecor(Art.dummy(), 131 * TS + 8, 130 * TS + 16, { solid: true, type: 'dummy' });
+      this.addDecor(Art.well(), vpx(109), vpy(133), { solid: true, footprint: { w: 2, h: 1, ox: 0, oy: 0 }, type: 'well' });
+      this.addDecor(Art.bench(), vpx(108), vpy(128), { solid: true, type: 'bench' });
+      this.addDecor(Art.bench(), vpx(125), vpy(129), { solid: true, type: 'bench' });
+      this.addDecor(Art.bench(), vpx(120), vpy(117), { solid: true, type: 'bench' });
+      this.addDecor(Art.lamp(), vpx(111), vpy(121), { solid: true, type: 'lamp' });
+      this.addDecor(Art.lamp(), vpx(123), vpy(121), { solid: true, type: 'lamp' });
+      this.addDecor(Art.lamp(), vpx(108), vpy(136), { solid: true, type: 'lamp' });
+      this.addDecor(Art.lamp(), vpx(136), vpy(132), { solid: true, type: 'lamp' });
+      this.addDecor(Art.lamp(), vpx(98), vpy(121), { solid: true, type: 'lamp' });
+      this.addDecor(Art.lamp(), vpx(140), vpy(122), { solid: true, type: 'lamp' });
+      this.addDecor(Art.barrel(), vpx(99), vpy(128), { solid: true, type: 'barrel' });
+      this.addDecor(Art.crate(), vpx(99), vpy(130), { solid: true, type: 'crate' });
+      this.addDecor(Art.barrel(), vpx(138), vpy(129), { solid: true, type: 'barrel' });
+      this.addDecor(Art.anvil(), vpx(137), vpy(127), { solid: false, type: 'anvil' });
+      this.addDecor(Art.dummy(), vpx(131), vpy(130), { solid: true, type: 'dummy' });
+      // petit marché autour de la fontaine
+      this.addDecor(Art.banner('plains'), vpx(108), vpy(123), { type: 'banner' });
+      this.addDecor(Art.banner('plains'), vpx(125), vpy(123), { type: 'banner' });
+      this.addDecor(Art.crate(), vpx(111), vpy(130), { solid: true, type: 'crate' });
+      this.addDecor(Art.barrel(), vpx(122), vpy(131), { solid: true, type: 'barrel' });
+      this.addDecor(Art.bench(), vpx(116), vpy(134), { solid: true, type: 'bench' });
+      this.addDecor(Art.lamp(), vpx(116), vpy(115), { solid: true, type: 'lamp' });
+
       // fleurs et petits décors de village
-      const flowerSpots = [[112, 134], [121, 135], [126, 124], [105, 123], [119, 121], [100, 137], [139, 134], [114, 116]];
+      const flowerSpots = [[112, 134], [121, 135], [126, 124], [105, 123], [119, 121], [100, 137], [139, 134], [114, 116], [96, 130], [143, 131]];
       flowerSpots.forEach(([tx, ty], i) => {
-        this.addDecor(Art.flowerPatch('plains', i % 2), tx * TS + 8, ty * TS + 16, { type: 'flower' });
+        this.addDecor(Art.flowerPatch('plains', i % 2), vpx(tx), vpy(ty), { type: 'flower' });
       });
-      const bushSpots = [[101, 117], [140, 114], [97, 134], [145, 128], [118, 140]];
-      bushSpots.forEach(([tx, ty], i) => {
-        this.addDecor(Art.bush('plains'), tx * TS + 8, ty * TS + 16, { solid: false, type: 'bush' });
+      const bushSpots = [[101, 117], [140, 114], [97, 134], [145, 128], [118, 140], [94, 124], [147, 122]];
+      bushSpots.forEach(([tx, ty]) => {
+        this.addDecor(Art.bush('plains'), vpx(tx), vpy(ty), { solid: false, type: 'bush' });
       });
     }
 
     placeOutposts(rng) {
       D.OUTPOSTS.forEach(def => {
-        const f = this.findFreeNear(def.x, def.y, 10, 2);
+        const f = this.findFreeNear(def.x, def.y, Math.round(10 * MS), 2);
         const tx = f.tx, ty = f.ty;
         const cx = tx * TS + 8, cy = ty * TS + 16;
 
         // On dégage le camp : aucun décor, arbre ou flaque ne doit gêner.
-        for (let yy = ty - 4; yy <= ty + 4; yy++) {
-          for (let xx = tx - 4; xx <= tx + 4; xx++) {
+        for (let yy = ty - 5; yy <= ty + 5; yy++) {
+          for (let xx = tx - 6; xx <= tx + 6; xx++) {
             if (!inBounds(xx, yy)) continue;
             const k = key(xx, yy);
             this.blocked[k] = 0;
@@ -419,6 +456,8 @@
         };
         outpost.img = Art.campGround(def.biome);
         this.outposts.push(outpost);
+        const oz = D.ZONE_BY_ID[def.biome];
+        if (oz) this.forceBiomeCircle(tx, ty, 8, oz.index);
 
         // tente au nord du camp
         this.addDecor(Art.tent(def.biome), cx, cy - 22, {
@@ -449,7 +488,6 @@
           loot: def.loot, biome: def.biome, opened: false, outpostId: def.id,
           hint: 'Ouvrir le coffre'
         });
-        this.chests.push(chest);
 
         // marchand éventuel
         if (def.vendor && D.VENDORS[def.vendor]) {
@@ -641,7 +679,7 @@
       D.NPCS.forEach(def => {
         let tx = def.x, ty = def.y;
         if (this.blocked[key(tx, ty)]) {
-          const f = this.findFreeNear(tx, ty, 5, 0);
+          const f = this.findFreeNear(tx, ty, 8, 0);
           tx = f.tx; ty = f.ty;
         }
         const sheet = Art.npcSheet(def.look);
@@ -651,13 +689,13 @@
           sheet, face: 0, hint: def.hint
         });
         // espace de dégagement
-        for (let yy = ty - 1; yy <= ty + 1; yy++) for (let xx = tx - 1; xx <= tx + 1; xx++) {
+        for (let yy = ty - 2; yy <= ty + 2; yy++) for (let xx = tx - 2; xx <= tx + 2; xx++) {
           if (inBounds(xx, yy)) this.blocked[key(xx, yy)] = 0;
         }
       });
       // sanctuaires / bivouacs
       D.SHRINES.forEach(def => {
-        let f = this.findFreeNear(def.x, def.y, 8, 1);
+        let f = this.findFreeNear(def.x, def.y, 10, 1);
         const img = Art.shrine(def.id === 'shrine_village' ? 'village' : 'camp');
         const obj = this.addInteractable({
           kind: 'shrine', id: def.id, name: def.name, x: f.tx * TS + 8, y: f.ty * TS + 15, tx: f.tx, ty: f.ty,
@@ -668,7 +706,7 @@
       // Les coffres sont créés dans placeOutposts : aucun coffre en pleine nature.
       // panneaux
       [...D.VILLAGE_SIGNS, ...D.ZONE_SIGNS].forEach(def => {
-        let f = this.findFreeNear(def.x, def.y, 8, 0);
+        let f = this.findFreeNear(def.x, def.y, 10, 0);
         this.addInteractable({
           kind: 'sign', id: def.id, name: 'Panneau', text: def.text,
           x: f.tx * TS + 8, y: f.ty * TS + 15, tx: f.tx, ty: f.ty, img: Art.signpost(),
@@ -683,7 +721,7 @@
         x: f.tx * TS + 8, y: f.ty * TS + 16, tx: f.tx, ty: f.ty, img: mImg,
         hint: 'Examiner le monolithe'
       });
-      for (let yy = f.ty - 1; yy <= f.ty + 1; yy++) for (let xx = f.tx - 1; xx <= f.tx + 1; xx++) {
+      for (let yy = f.ty - 3; yy <= f.ty + 3; yy++) for (let xx = f.tx - 3; xx <= f.tx + 3; xx++) {
         if (inBounds(xx, yy)) this.blocked[key(xx, yy)] = 1;
       }
       // petit autel de lisière de village / panneau d'accueil
@@ -694,7 +732,9 @@
     generateSpawns(rng) {
       const speciesByZone = {};
       D.ZONES.forEach(z => { speciesByZone[z.id] = z.species; });
-      const total = 62;
+      // La carte a quadruplé de surface : on garde une densité plus sauvage,
+      // volontairement inférieure à l'ancienne, pour laisser respirer l'exploration.
+      const total = Math.round(62 * MS * MS / 2);
       D.ZONES.forEach((z, zi) => {
         let attempts = 0;
         let made = 0;
@@ -708,7 +748,7 @@
           if (this.path[k]) continue;
           if (this.isNearProtected(tx, ty, 2)) continue;
           // éviter les spawns collés
-          if (this.spawnPoints.some(s => U.dist2(s.tx, s.ty, tx, ty) < 16)) continue;
+          if (this.spawnPoints.some(s => U.dist2(s.tx, s.ty, tx, ty) < 20)) continue;
           const speciesId = z.species[Math.floor(rng() * z.species.length)];
           const sp = D.SPECIES[speciesId];
           if (!sp) continue;
@@ -725,15 +765,15 @@
     }
 
     finalize() {
-      // Libre autour du point d'apparition du joueur
-      const spawnTile = { x: D.VILLAGE.x, y: D.VILLAGE.y + 6 };
-      for (let yy = spawnTile.y - 1; yy <= spawnTile.y + 1; yy++) for (let xx = spawnTile.x - 1; xx <= spawnTile.x + 1; xx++) {
+      // Libre autour du point d'apparition du joueur, juste au sud de la fontaine
+      const spawnTile = { x: D.VILLAGE.x, y: D.VILLAGE.y + 5 };
+      for (let yy = spawnTile.y - 2; yy <= spawnTile.y + 2; yy++) for (let xx = spawnTile.x - 2; xx <= spawnTile.x + 2; xx++) {
         if (inBounds(xx, yy)) { this.blocked[key(xx, yy)] = 0; this.special[key(xx, yy)] = SPECIAL_NONE; }
       }
       this.playerSpawn = { x: spawnTile.x * TS + 8, y: spawnTile.y * TS + 14 };
       // aire de circulation minimale devant les bâtiments / PNJ
       this.npcs.forEach(n => {
-        for (let yy = n.ty; yy <= n.ty + 1; yy++) for (let xx = n.tx - 1; xx <= n.tx + 1; xx++) {
+        for (let yy = n.ty - 1; yy <= n.ty + 3; yy++) for (let xx = n.tx - 2; xx <= n.tx + 2; xx++) {
           if (inBounds(xx, yy)) this.blocked[key(xx, yy)] = 0;
         }
       });
@@ -743,10 +783,10 @@
       this.decorGrid.clear();
       this.decor.forEach(o => this.addToGrid(o));
       // pas de collision sur les tuiles de lisière de place
-      for (let a = 0; a < 20; a++) {
-        const ang = a / 20 * Math.PI * 2;
-        const tx = Math.round(D.VILLAGE.x + Math.cos(ang) * 13);
-        const ty = Math.round(D.VILLAGE.y + Math.sin(ang) * 13);
+      for (let a = 0; a < 36; a++) {
+        const ang = a / 36 * Math.PI * 2;
+        const tx = Math.round(D.VILLAGE.x + Math.cos(ang) * 13 * MS);
+        const ty = Math.round(D.VILLAGE.y + Math.sin(ang) * 13 * MS);
         if (inBounds(tx, ty)) this.blocked[key(tx, ty)] = 0;
       }
     }
@@ -881,16 +921,22 @@
           }
         }
       }
-      // décalques de sol
+      // décalques de sol : ces images sont des disques centrés sur leur point
+      // d'ancrage, pas des props ancrés par le bas.
       const decals = [];
-      if (this.village.img) decals.push({ img: this.village.img, x: this.village.x, y: this.village.y - 8, r: 210 });
-      this.outposts.forEach(o => { if (o.img) decals.push({ img: o.img, x: o.x, y: o.y - 8, r: 90 }); });
-      this.arenas.forEach(a => decals.push({ img: a.img, x: a.x, y: a.y - 6, r: a.radiusPx + 20 }));
-      decals.push({ img: this.finalArena.img, x: this.finalArena.x, y: this.finalArena.y - 6, r: this.finalArena.radiusPx + 20 });
+      if (this.village.img) decals.push({ img: this.village.img, x: this.village.x, y: this.village.y, oy: 0 });
+      this.outposts.forEach(o => { if (o.img) decals.push({ img: o.img, x: o.x + 4, y: o.y + 2, oy: 0 }); });
+      this.arenas.forEach(a => decals.push({ img: a.img, x: a.x, y: a.y, oy: 0 }));
+      decals.push({ img: this.finalArena.img, x: this.finalArena.x, y: this.finalArena.y, oy: 0 });
       for (const d of decals) {
         if (!d.img) continue;
-        if (d.x + d.r < camX || d.x - d.r > camX + vw || d.y + d.r < camY || d.y - d.r > camY + vh) continue;
-        ctx.drawImage(d.img, Math.round(d.x - d.img.width / 2), Math.round(d.y - d.img.height + 12));
+        const hw = d.img.width / 2, hh = d.img.height / 2;
+        if (d.x + hw < camX || d.x - hw > camX + vw || d.y + hh < camY || d.y - hh > camY + vh) continue;
+        ctx.drawImage(
+          d.img,
+          Math.round(d.x - hw),
+          Math.round(d.y - hh + (d.oy || 0))
+        );
       }
     }
 

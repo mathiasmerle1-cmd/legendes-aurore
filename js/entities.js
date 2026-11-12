@@ -6,6 +6,10 @@
   const U = window.U, D = window.DATA, Art = window.Art;
 
   const FOOT_W = 10, FOOT_H = 8;
+  const DUST_COLORS = {
+    plains: '#cbb98f', forest: '#9c8a68', desert: '#d9c08a',
+    swamp: '#8b9070', tundra: '#e6f3f8', volcano: '#90746b'
+  };
 
   function angleOf(dx, dy) { return Math.atan2(dy, dx); }
   function facingFromAngle(a) {
@@ -48,6 +52,7 @@
       this.invuln = 0;
       this.hitFlash = 0;
       this.potionCd = 0;
+      this.dustTimer = 0;
       this.stamina = 100;
       this.maxStamina = 100;
       this.kills = 0;
@@ -252,6 +257,7 @@
       this.invuln = Math.max(0, this.invuln - dt);
       this.hitFlash = Math.max(0, this.hitFlash - dt);
       this.potionCd = Math.max(0, this.potionCd - dt);
+      this.dustTimer = Math.max(0, this.dustTimer - dt);
       this.stamina = Math.min(this.maxStamina, this.stamina + dt * 26);
 
       const ax = game.input.axis();
@@ -270,6 +276,11 @@
         this.moving = true;
         this.walkTime += dt;
         this.facing = facingFromAngle(Math.atan2(ax.y, ax.x));
+        if (this.dustTimer <= 0) {
+          this.dustTimer = 0.22 + Math.random() * 0.12;
+          const zoneId = game.currentZone().id;
+          game.fx.dust(this.x, this.y, 1, DUST_COLORS[zoneId]);
+        }
         if (!game.world.isBlockedPx(this.x, this.y)) {
           this.lastSafe.x = this.x;
           this.lastSafe.y = this.y;
@@ -306,13 +317,8 @@
       const frames = this.sheet.frames[this.facing] || this.sheet.frames[0];
       const img = frames[this.frame % frames.length] || frames[0];
       const px = this.x - camX, py = this.y - camY;
-      // ombre
-      ctx.globalAlpha = 0.26;
-      ctx.fillStyle = '#17131c';
-      ctx.beginPath();
-      ctx.ellipse(Math.round(px), Math.round(py - 1), 7, 3, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
+      // ombre douce et pixelisée
+      Art.drawShadow(ctx, px, py - 1, 19, 7, 0.95);
 
       // aura d'invulnérabilité
       if (this.dodgeTimer > 0 || this.invuln > 0.45) {
@@ -570,12 +576,7 @@
       const scale = (this.elite ? 1.12 : 1) * (this.species.scale || 1) * (this.summoned ? 0.82 : 1);
       const w = img.width * scale, h = img.height * scale;
 
-      ctx.globalAlpha = 0.25;
-      ctx.fillStyle = '#17131c';
-      ctx.beginPath();
-      ctx.ellipse(Math.round(px), Math.round(this.y - camY - 1), Math.max(5, w * 0.28), 3, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
+      Art.drawShadow(ctx, px, this.y - camY - 1, Math.max(12, w * 0.62), Math.max(5, h * 0.16), 0.9);
 
       if (this.elite) {
         ctx.globalAlpha = 0.35 + Math.sin(time * 4) * 0.12;
@@ -936,12 +937,7 @@
       const px = this.x - camX;
       const py = this.y - camY + bob;
 
-      ctx.globalAlpha = 0.3;
-      ctx.fillStyle = '#121016';
-      ctx.beginPath();
-      ctx.ellipse(Math.round(px), Math.round(this.y - camY), Math.max(16, w * 0.3), 7, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
+      Art.drawShadow(ctx, px, this.y - camY - 1, Math.max(34, w * 0.6), Math.max(10, h * 0.12), 1);
 
       if (this.enraged) {
         ctx.globalAlpha = 0.22 + Math.sin(time * 5) * 0.1;

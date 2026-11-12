@@ -628,9 +628,10 @@
     });
   };
 
-  Art.villagePlaza = function () {
-    const radius = 188, r = radius + 16;
-    return Art.cached('village-plaza', () => {
+  Art.villagePlaza = function (mult) {
+    mult = mult || 1;
+    const radius = Math.round(188 * mult), r = radius + 16;
+    return Art.cached('village-plaza:' + mult, () => {
       const c = cvs(r * 2, r * 2), ctx = c.getContext('2d');
       const cx = r, cy = r;
       const rng = U.mulberry32(44211);
@@ -638,7 +639,7 @@
       E(ctx, cx, cy, radius + 4, radius + 4, '#7d6847');
       E(ctx, cx, cy, radius, radius, '#bfa77a');
       for (let ring = 0; ring < 9; ring++) {
-        const rr = 24 + ring * 18;
+        const rr = (24 + ring * 18) * mult;
         const count = Math.floor(rr * 0.55);
         for (let i = 0; i < count; i++) {
           const ang = (i / count) * Math.PI * 2 + ring * 0.2;
@@ -648,18 +649,19 @@
           R(ctx, x - 2, y - 2, 4, 1, U.shade(col, 13));
         }
       }
-      E(ctx, cx, cy, 54, 54, '#c7b183');
+      E(ctx, cx, cy, 54 * mult, 54 * mult, '#c7b183');
       for (let i = 0; i < 8; i++) {
         const ang = i / 8 * Math.PI * 2;
-        const x = cx + Math.cos(ang) * 27, y = cy + Math.sin(ang) * 27;
+        const x = cx + Math.cos(ang) * 27 * mult, y = cy + Math.sin(ang) * 27 * mult;
         R(ctx, x - 1, y - 1, 2, 2, '#8a7555');
       }
       // bordures irrégulières
-      for (let i = 0; i < 140; i++) {
+      const border = Math.round(140 * mult);
+      for (let i = 0; i < border; i++) {
         const ang = rng() * Math.PI * 2, dist = radius - 3 - rng() * 7;
         R(ctx, cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, 3, 2, '#779052');
       }
-      for (let i = 0; i < 24; i++) {
+      for (let i = 0; i < Math.round(24 * mult); i++) {
         const ang = rng() * Math.PI * 2, dist = radius * (0.4 + rng() * 0.55);
         R(ctx, cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, 1, 1, '#8f7b5b');
       }

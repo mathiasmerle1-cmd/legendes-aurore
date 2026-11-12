@@ -8,7 +8,9 @@
   D.TITLE = "LES LÉGENDES D'AURORE";
   D.VERSION = '1.0.0';
   D.SAVE_KEY = 'legendes_aurore_save_v1';
-  D.WORLD_SIZE = 240;
+  /* La carte de référence fait 240 × 240. Le monde final vaut 480 × 480. */
+  D.MAP_SCALE = 2;
+  D.WORLD_SIZE = 240 * D.MAP_SCALE;
   D.TILE = 16;
 
   /* ------------------------------------------------------------
@@ -1043,6 +1045,36 @@
 
   D.CHEST_BY_ID = Object.fromEntries(D.CHESTS.map(c => [c.id, c]));
   D.SHRINE_BY_ID = Object.fromEntries(D.SHRINES.map(s => [s.id, s]));
+
+  /* ------------------------------------------------------------
+     Agrandissement du monde
+     Toutes les coordonnées ci-dessus sont écrites dans l'espace
+     de conception 240 × 240. On les projette une seule fois dans
+     l'espace final 480 × 480, sans toucher au reste du code.
+     ------------------------------------------------------------ */
+  D.scaleWorld = function () {
+    const s = D.MAP_SCALE;
+    const pt = (o) => {
+      if (!o || typeof o.x !== 'number' || typeof o.y !== 'number') return;
+      o.x *= s;
+      o.y *= s;
+    };
+    D.ZONES.forEach(z => {
+      pt(z.anchor);
+      z.arenas.forEach(pt);
+    });
+    pt(D.VILLAGE);
+    pt(D.FINAL_ARENA);
+    D.VILLAGE.r *= s;
+    D.FINAL_ARENA.r *= s;
+    D.NPCS.forEach(pt);
+    D.SHRINES.forEach(pt);
+    D.VILLAGE_SIGNS.forEach(pt);
+    D.OUTPOSTS.forEach(pt);
+    D.CHESTS.forEach(pt);
+    D.ZONE_SIGNS.forEach(pt);
+  };
+  D.scaleWorld();
 
   window.DATA = D;
 })();

@@ -46,6 +46,8 @@
     interactTarget: null,
     lastShrine: "Sanctuaire d'Aurore",
     introShown: false,
+    discovery: null,
+    discoveryClock: 0,
 
     /* ----------------------------------------------------------
        Démarrage
@@ -188,6 +190,7 @@
       this.updateProjectiles(dt);
       this.updateArenas(dt);
       this.updateZone(dt);
+      this.updateDiscovery(dt);
       this.updateInteractTarget();
     },
 
@@ -554,6 +557,102 @@
       if (!this.player) return D.ZONES[0];
       const idx = this.world.biomeAtPx(this.player.x, this.player.y);
       return D.ZONES[idx] || D.ZONES[0];
+    },
+
+    /* ----------------------------------------------------------
+       Exploration : les lieux se révèlent quand on s'en approche
+       ---------------------------------------------------------- */
+    freshDiscovery() {
+      return { zones: { plains: true }, pois: { village: true } };
+    },
+
+    loadDiscovery(data) {
+      const base = this.freshDiscovery();
+      if (data && data.zones) {
+        for (const id of Object.keys(data.zones)) {
+          if (data.zones[id] && D.ZONE_BY_ID[id]) base.zones[id] = true;
+        }
+      }
+      if (data && data.pois) {
+        for (const key of Object.keys(data.pois)) {
+          if (data.pois[key]) base.pois[key] = true;
+        }
+      }
+      base.zones.plains = true;
+      return base;
+    },
+
+    isDiscovered(kind, id) {
+      if (!this.discovery) this.discovery = this.freshDiscovery();
+      return !!this.discovery.pois[kind + ':' + id];
+    },
+
+    reveal(kind, id, label, x, y, color) {
+      const key = kind + ':' + id;
+      if (!this.discovery) this.discovery = this.freshDiscovery();
+      if (this.discovery.pois[key]) return false;
+      this.discovery.pois[key] = true;
+      this.toast('DÉCOUVERT · ' + label, color || '#ffe6a0');
+      if (this.player) this.fx.ring(this.player.x, this.player.y - 10, color || '#ffe6a0', 28, 0.55);
+      if (kind === 'final') window.AudioSys.sfx('warp');
+      this.saveSoon();
+      return true;
+    },
+
+    getExploration() {
+      const d = this.discovery || this.freshDiscovery();
+      const zones = D.ZONES.filter(z => d.zones[z.id]).length;
+      const outposts = D.OUTPOSTS.filter(o => d.pois['outpost:' + o.id]).length;
+      const shrines = D.SHRINES.filter(s => d.pois['shrine:' + s.id]).length;
+      const arenaTotal = D.ZONES.reduce((n, z) => n + z.arenas.length, 0);
+      const arenas = D.ZONES.reduce((n, z) => n + z.arenas.filter(a => d.pois['arena:' + a.id]).length, 0);
+      const final = d.pois['final'] ? 1 : 0;
+      const total = D.ZONES.length + D.OUTPOSTS.length + D.SHRINES.length + arenaTotal + 1;
+      const found = zones + outposts + shrines + arenas + final;
+      return {
+        pct: Math.round(found / total * 100),
+        found, total,
+        zones, zonesTotal: D.ZONES.length,
+        outposts, outpostsTotal: D.OUTPOSTS.length,
+        shrines, shrinesTotal: D.SHRINES.length,
+        arenas, arenasTotal: arenaTotal,
+        final: !!final
+      };
+    },
+
+    updateDiscovery(dt) {
+      if (!this.player) return;
+      this.discoveryClock -= dt;
+      if (this.discoveryClock > 0) return;
+      this.discoveryClock = 0.45;
+      if (!this.discovery) this.discovery = this.freshDiscovery();
+      const p = this.player;
+      const zone = this.currentZone();
+      if (!this.discovery.zones[zone.id]) {
+        this.discovery.zones[zone.id] = true;
+        this.toast('CARTE · ' + zone.name + ' révélée', zone.color);
+        this.saveSoon();
+      }
+      for (const o of this.world.outposts) {
+        if (U.dist(p.x, p.y, o.x, o.y) < 14 * TILE) {
+          this.reveal('outpost', o.id, 'Avant-poste : ' + o.name, o.x, o.y, '#8ef0a8');
+        }
+      }
+      for (const s of this.world.shrines) {
+        if (U.dist(p.x, p.y, s.x, s.y) < 12 * TILE) {
+          this.reveal('shrine', s.id, 'Sanctuaire : ' + s.name, s.x, s.y, '#8fe6e0');
+        }
+      }
+      for (const a of this.world.arenas) {
+        if (U.dist(p.x, p.y, a.x, a.y) < a.radiusPx + 5 * TILE) {
+          const label = a.kind === 'big' ? 'Arène d\'un Gardien' : 'Arène ancienne';
+          this.reveal('arena', a.id, label + ' · ' + a.zone.short, a.x, a.y, '#ffbe5c');
+        }
+      }
+      const f = this.world.finalArena;
+      if (U.dist(p.x, p.y, f.x, f.y) < 18 * TILE) {
+        this.reveal('final', 'final', 'Ruines de l\'Aube', f.x, f.y, '#c891ff');
+      }
     },
 
     bigBossesDefeated() {

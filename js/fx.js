@@ -77,12 +77,12 @@
       });
     },
 
-    dust(x, y, count) {
+    dust(x, y, count, color) {
       for (let i = 0; i < (count || 3); i++) {
         this.particle({
           x: x + (Math.random() * 10 - 5), y: y - 1,
           vx: (Math.random() - 0.5) * 40, vy: -10 - Math.random() * 22,
-          color: '#cbb98f', size: 1, life: 0.3 + Math.random() * 0.3, max: 0.6, grav: -10
+          color: color || '#cbb98f', size: 1, life: 0.3 + Math.random() * 0.3, max: 0.6, grav: -10
         });
       }
     },

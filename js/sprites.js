@@ -69,6 +69,55 @@
   Art.E = E;
   Art.line = line;
 
+  /* Lumière de contour : un liseré chaud sur les pixels exposés en haut à
+     gauche de chaque sprite. Cela donne du relief aux personnages sans
+     ajouter une seule image externe. */
+  function rimLight(src) {
+    const w = src.width, h = src.height;
+    const ctx = src.getContext('2d');
+    const image = ctx.getImageData(0, 0, w, h);
+    const px = image.data;
+    const isOutline = (i) => px[i] === 36 && px[i + 1] === 28 && px[i + 2] === 43 && px[i + 3] > 0;
+    const isOpaque = (i) => i >= 0 && px[i + 3] > 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        if (px[i + 3] === 0 || isOutline(i)) continue;
+        const top = y > 0 ? ((y - 1) * w + x) * 4 : -1;
+        const left = x > 0 ? (y * w + x - 1) * 4 : -1;
+        const topEdge = !isOpaque(top) || isOutline(top);
+        const leftEdge = !isOpaque(left) || isOutline(left);
+        if (!topEdge && !leftEdge) continue;
+        const t = topEdge ? 0.26 : 0.1;
+        px[i] = Math.round(px[i] + (255 - px[i]) * t);
+        px[i + 1] = Math.round(px[i + 1] + (238 - px[i + 1]) * t);
+        px[i + 2] = Math.round(px[i + 2] + (196 - px[i + 2]) * t);
+      }
+    }
+    ctx.putImageData(image, 0, 0);
+    return src;
+  }
+  Art.rimLight = rimLight;
+
+  /* Ombre portée pixel art, réutilisée par tous les personnages. */
+  let shadowSprite = null;
+  function getShadowSprite() {
+    if (shadowSprite) return shadowSprite;
+    const c = cvs(44, 20), ctx = c.getContext('2d');
+    E(ctx, 22, 10, 20, 7, 'rgba(20,15,25,0.18)');
+    E(ctx, 22, 10, 16, 5, 'rgba(20,15,25,0.24)');
+    E(ctx, 22, 10, 11, 3, 'rgba(20,15,25,0.26)');
+    shadowSprite = c;
+    return c;
+  }
+  Art.drawShadow = function (ctx, x, y, w, h, alpha) {
+    const img = getShadowSprite();
+    ctx.save();
+    ctx.globalAlpha = alpha === undefined ? 0.9 : alpha;
+    ctx.drawImage(img, Math.round(x - w / 2), Math.round(y - h / 2), Math.max(2, Math.round(w)), Math.max(2, Math.round(h)));
+    ctx.restore();
+  };
+
   function mirror(src) {
     const c = cvs(src.width, src.height);
     const ctx = c.getContext('2d');
@@ -590,17 +639,19 @@
         // down
         let c = cvs(18, 24);
         drawCharacterBase(c.getContext('2d'), 0, frame, p, flags);
-        frames[0][frame] = outline(c, '#241c2b');
+        frames[0][frame] = rimLight(outline(c, '#241c2b'));
         // right
         c = cvs(18, 24);
         drawCharacterBase(c.getContext('2d'), 2, frame, p, flags);
-        frames[2][frame] = outline(c, '#241c2b');
-        // left = miroir
-        frames[1][frame] = mirror(frames[2][frame]);
+        const right = outline(c, '#241c2b');
+        const left = mirror(right);
+        frames[2][frame] = rimLight(right);
+        // left = miroir du sprite non éclairé, puis lumière de contour
+        frames[1][frame] = rimLight(left);
         // up
         c = cvs(18, 24);
         drawCharacterBase(c.getContext('2d'), 3, frame, p, flags);
-        frames[3][frame] = outline(c, '#241c2b');
+        frames[3][frame] = rimLight(outline(c, '#241c2b'));
       }
       return { frames, look: mergedLook };
     });
