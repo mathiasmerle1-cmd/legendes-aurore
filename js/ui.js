@@ -855,7 +855,7 @@
             <div class="map-tip">Les boss brillent sur la carte. Les sanctuaires soignent et sauvegardent.</div>
           </div>
         </div>
-        <div class="panel-foot"><span class="hint">M pour fermer · Le monde fait 240 × 240 tuiles.</span><span class="hint">${prog.done}/18 boss de zone vaincus</span></div>
+        <div class="panel-foot"><span class="hint">M pour fermer · Le monde fait 480 × 480 tuiles.</span><span class="hint">${prog.done}/18 boss de zone vaincus</span></div>
       </div>
     `;
     s.querySelector('#map-close').addEventListener('click', () => this.close());
