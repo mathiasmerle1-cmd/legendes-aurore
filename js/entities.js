@@ -263,8 +263,11 @@
       const ax = game.input.axis();
       this.moving = false;
 
-      if (this.dodgeTimer > 0) {
-        game.world.moveEntity(this, this.dodgeVX * dt, this.dodgeVY * dt, FOOT_W, FOOT_H);
+      if (game.interiorFadeDir > 0) {
+        // Pendant le fondu au noir, on fige les déplacements.
+        this.walkTime = 0;
+      } else if (this.dodgeTimer > 0) {
+        game.moveEntity(this, this.dodgeVX * dt, this.dodgeVY * dt, FOOT_W, FOOT_H);
         this.moving = true;
         this.walkTime += dt * 2;
         if (Math.random() < 0.8) {
@@ -272,18 +275,20 @@
         }
       } else if (ax.x || ax.y) {
         const sp = this.moveSpeed;
-        game.world.moveEntity(this, ax.x * sp * dt, ax.y * sp * dt, FOOT_W, FOOT_H);
+        game.moveEntity(this, ax.x * sp * dt, ax.y * sp * dt, FOOT_W, FOOT_H);
         this.moving = true;
         this.walkTime += dt;
         this.facing = facingFromAngle(Math.atan2(ax.y, ax.x));
-        if (this.dustTimer <= 0) {
-          this.dustTimer = 0.22 + Math.random() * 0.12;
-          const zoneId = game.currentZone().id;
-          game.fx.dust(this.x, this.y, 1, DUST_COLORS[zoneId]);
-        }
-        if (!game.world.isBlockedPx(this.x, this.y)) {
-          this.lastSafe.x = this.x;
-          this.lastSafe.y = this.y;
+        if (!game.interior) {
+          if (this.dustTimer <= 0) {
+            this.dustTimer = 0.22 + Math.random() * 0.12;
+            const zoneId = game.currentZone().id;
+            game.fx.dust(this.x, this.y, 1, DUST_COLORS[zoneId]);
+          }
+          if (!game.world.isBlockedPx(this.x, this.y)) {
+            this.lastSafe.x = this.x;
+            this.lastSafe.y = this.y;
+          }
         }
       } else {
         this.walkTime = 0;
@@ -295,13 +300,13 @@
         this.frame = 0;
       }
 
-      // Actions monde
-      if (!game.uiOpen) {
-        if (game.input.wasPressed('KeyJ', 'Space', 'Mouse0')) {
+      // Actions monde (pas de combat à l'intérieur des maisons)
+      if (!game.uiOpen && game.interiorFadeDir <= 0) {
+        if (!game.interior && game.input.wasPressed('KeyJ', 'Space', 'Mouse0')) {
           const aim = game.getAimWorld();
           this.attack(game, aim.x, aim.y);
         }
-        if (game.input.wasPressed('KeyK', 'ShiftLeft', 'ShiftRight')) this.tryDodge(game);
+        if (!game.interior && game.input.wasPressed('KeyK', 'ShiftLeft', 'ShiftRight')) this.tryDodge(game);
         if (game.input.wasPressed('KeyH')) this.usePotion(game);
         if (game.input.wasPressed('KeyE', 'Enter')) game.interact();
       }

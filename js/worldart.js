@@ -630,40 +630,65 @@
 
   Art.villagePlaza = function (mult) {
     mult = mult || 1;
-    const radius = Math.round(188 * mult), r = radius + 16;
+    const radius = Math.round(188 * mult), r = radius + 20;
     return Art.cached('village-plaza:' + mult, () => {
       const c = cvs(r * 2, r * 2), ctx = c.getContext('2d');
       const cx = r, cy = r;
       const rng = U.mulberry32(44211);
-      ctx.globalAlpha = 0.22; E(ctx, cx, cy, radius + 12, radius + 12, '#2d3220'); ctx.globalAlpha = 1;
-      E(ctx, cx, cy, radius + 4, radius + 4, '#7d6847');
-      E(ctx, cx, cy, radius, radius, '#bfa77a');
-      for (let ring = 0; ring < 9; ring++) {
-        const rr = (24 + ring * 18) * mult;
-        const count = Math.floor(rr * 0.55);
+
+      // herbe irrégulière qui vient mordre la bordure
+      for (let i = 0; i < Math.round(230 * mult); i++) {
+        const ang = rng() * Math.PI * 2;
+        const dist = radius + 2 + rng() * 14;
+        R(ctx, cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, 3, 2, rng() < 0.5 ? '#5f9a48' : '#4f843c');
+      }
+      // ombre périphérique et bord de terre
+      ctx.globalAlpha = 0.22;
+      E(ctx, cx, cy, radius + 11, radius + 11, '#272a1e');
+      ctx.globalAlpha = 1;
+      E(ctx, cx, cy, radius + 5, radius + 5, '#6c6250');
+      E(ctx, cx, cy, radius + 1, radius + 1, '#857a66');
+      E(ctx, cx, cy, radius - 2, radius - 2, '#928878');
+
+      // champ de pavés en anneaux
+      const stoneCols = ['#a49a89', '#b0a695', '#978d7d', '#bbb1a0', '#8e8576'];
+      const ringStep = Math.max(9, Math.round(12 * mult));
+      const stoneW = Math.max(6, Math.round(9 * mult));
+      const stoneH = Math.max(3, Math.round(5 * mult));
+      for (let ring = 0; ring * ringStep < radius - 6; ring++) {
+        const rr = ring * ringStep + ringStep * 0.55;
+        const count = Math.max(12, Math.round((Math.PI * 2 * rr) / (stoneW * 0.86)));
+        const off = ring % 2 ? 0.5 : 0;
         for (let i = 0; i < count; i++) {
-          const ang = (i / count) * Math.PI * 2 + ring * 0.2;
-          const x = cx + Math.cos(ang) * rr, y = cy + Math.sin(ang) * rr;
-          const col = rng() < 0.5 ? '#c8b183' : rng() < 0.5 ? '#b39c70' : '#d3bf92';
-          R(ctx, x - 3, y - 1, 5 + (rng() < 0.3 ? 2 : 0), 3, col);
-          R(ctx, x - 2, y - 2, 4, 1, U.shade(col, 13));
+          const ang = ((i + off) / count) * Math.PI * 2;
+          const x = cx + Math.cos(ang) * rr + (rng() - 0.5) * 2;
+          const y = cy + Math.sin(ang) * rr + (rng() - 0.5) * 2;
+          const col = stoneCols[Math.floor(rng() * stoneCols.length)];
+          const w = stoneW + (rng() < 0.22 ? 2 : 0), h = stoneH + (rng() < 0.25 ? 1 : 0);
+          R(ctx, x - w / 2, y - h / 2, w, h, col);
+          R(ctx, x - w / 2 + 1, y - h / 2, w - 2, 1, U.shade(col, 15));
+          R(ctx, x - w / 2 + 1, y + h / 2 - 1, w - 2, 1, U.shade(col, -18));
         }
       }
-      E(ctx, cx, cy, 54 * mult, 54 * mult, '#c7b183');
-      for (let i = 0; i < 8; i++) {
-        const ang = i / 8 * Math.PI * 2;
-        const x = cx + Math.cos(ang) * 27 * mult, y = cy + Math.sin(ang) * 27 * mult;
-        R(ctx, x - 1, y - 1, 2, 2, '#8a7555');
+
+      // médaillon central clair
+      E(ctx, cx, cy, 46 * mult, 46 * mult, '#877d6e');
+      E(ctx, cx, cy, 42 * mult, 42 * mult, '#a79c89');
+      E(ctx, cx, cy, 31 * mult, 31 * mult, '#b4a995');
+      for (let i = 0; i < 14; i++) {
+        const ang = i / 14 * Math.PI * 2;
+        const rr = 37 * mult;
+        R(ctx, cx + Math.cos(ang) * rr - 2, cy + Math.sin(ang) * rr - 1, 5, 3, i % 2 ? '#9a8f7c' : '#c0b5a1');
       }
-      // bordures irrégulières
-      const border = Math.round(140 * mult);
-      for (let i = 0; i < border; i++) {
-        const ang = rng() * Math.PI * 2, dist = radius - 3 - rng() * 7;
-        R(ctx, cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, 3, 2, '#779052');
+      // fissures et mousse
+      for (let i = 0; i < Math.round(18 * mult); i++) {
+        const ang = rng() * Math.PI * 2, dist = 70 * mult + rng() * (radius - 70 * mult);
+        const x = cx + Math.cos(ang) * dist, y = cy + Math.sin(ang) * dist;
+        R(ctx, x, y, 1 + Math.floor(rng() * 3), 1, '#6f6657');
       }
-      for (let i = 0; i < Math.round(24 * mult); i++) {
-        const ang = rng() * Math.PI * 2, dist = radius * (0.4 + rng() * 0.55);
-        R(ctx, cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, 1, 1, '#8f7b5b');
+      for (let i = 0; i < Math.round(80 * mult); i++) {
+        const ang = rng() * Math.PI * 2, dist = radius * (0.45 + rng() * 0.55);
+        R(ctx, cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, 2, 1, rng() < 0.5 ? '#6e8752' : '#7d9660');
       }
       return c;
     });

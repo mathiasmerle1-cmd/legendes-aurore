@@ -36,6 +36,7 @@
       this.signs = [];
       this.spawnPoints = [];
       this.outposts = [];
+      this.houses = [];
       this.village = null;
       this.finalArena = null;
       this.monolith = null;
@@ -368,10 +369,11 @@
       const vpy = y => vty(y) * TS + 16;
 
       // sol de la place, agrandi avec le village
-      this.village.img = Art.villagePlaza(1.7);
+      this.village.img = Art.villagePlaza(1.35);
       this.village.decal = true;
 
       // bâtiments
+      let houseCount = 0;
       const addBuilding = (img, tx, ty, wid, hei, kind) => {
         const x = tx * TS + 8, y = ty * TS + 16;
         const fp = { w: wid, h: hei, ox: -Math.floor(wid / 2), oy: -hei + 1 };
@@ -382,6 +384,23 @@
         }
         this.addDecor(img, x, y, { type: kind, id: kind });
         this.emitters.push({ x: x + 17, y: y - img.height + 11, type: 'smoke', rate: 1.1, timer: rng() * 2 });
+
+        if (kind === 'house') {
+          const index = houseCount++;
+          const house = {
+            id: 'house_' + index,
+            index,
+            zoneId: 'plains',
+            tx, ty, x, y, w: wid, h: hei,
+            door: { x, y: y + 12 }
+          };
+          this.houses.push(house);
+          // La porte se trouve juste devant la façade, sur la tuile libre.
+          this.addInteractable({
+            kind: 'door', x: house.door.x, y: house.door.y,
+            houseId: house.id, house, name: 'Maison'
+          });
+        }
       };
       addBuilding(Art.hall(), vtx(116), vty(120), 9, 3, 'hall');
       addBuilding(Art.shop(), vtx(103), vty(126), 7, 3, 'shop');
@@ -934,33 +953,41 @@
         if (d.x + hw < camX || d.x - hw > camX + vw || d.y + hh < camY || d.y - hh > camY + vh) continue;
         ctx.drawImage(
           d.img,
-          Math.round(d.x - hw),
-          Math.round(d.y - hh + (d.oy || 0))
+          Math.round(d.x - hw - camX),
+          Math.round(d.y - hh + (d.oy || 0) - camY)
         );
       }
     }
 
-    drawMinimap(ctx, w, h) {
+    drawMinimap(ctx, w, h, knownZones) {
       // carte simplifiée du monde (pour le menu carte)
       const sx = w / W, sy = h / H;
       const colors = {
         plains: '#83b968', forest: '#4f7c4b', desert: '#d7bd78', swamp: '#677a50',
         tundra: '#dbe9ee', volcano: '#72524b'
       };
+      const dark = {
+        plains: '#263129', forest: '#222d26', desert: '#302c24', swamp: '#252a23',
+        tundra: '#2a3034', volcano: '#2f2524'
+      };
       for (let ty = 0; ty < H; ty += 2) {
         for (let tx = 0; tx < W; tx += 2) {
           const k = key(tx, ty);
-          const bi = D.ZONES[this.biome[k]].id;
+          const zone = D.ZONES[this.biome[k]];
+          const bi = zone.id;
+          const known = !knownZones || !!knownZones[bi];
           const sp = this.special[k];
-          let col = colors[bi] || '#888';
-          if (sp === SPECIAL_WATER || sp === SPECIAL_LAVA) col = sp === SPECIAL_LAVA ? '#bf4d2b' : '#4e8ea4';
-          if (this.path[k]) col = '#cdb183';
-          if (this.special[k] === SPECIAL_BRIDGE) col = '#a67848';
+          let col = known ? (colors[bi] || '#888') : (dark[bi] || '#23252e');
+          if (sp === SPECIAL_WATER || sp === SPECIAL_LAVA) {
+            col = known ? (sp === SPECIAL_LAVA ? '#bf4d2b' : '#4e8ea4') : (sp === SPECIAL_LAVA ? '#35201d' : '#1b2830');
+          }
+          if (this.path[k]) col = known ? '#cdb183' : '#2b2620';
+          if (this.special[k] === SPECIAL_BRIDGE) col = known ? '#a67848' : '#32291f';
           ctx.fillStyle = col;
           ctx.fillRect(Math.floor(tx * sx), Math.floor(ty * sy), Math.ceil(sx * 2), Math.ceil(sy * 2));
         }
       }
-      // village
+      // village (toujours connu)
       const vx = this.village.tx * sx, vy = this.village.ty * sy;
       ctx.fillStyle = '#e5d099'; ctx.fillRect(vx - 8, vy - 8, 16, 16);
       ctx.fillStyle = '#8e6e48'; ctx.fillRect(vx - 6, vy - 6, 12, 12);

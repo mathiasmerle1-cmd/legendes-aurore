@@ -824,6 +824,11 @@
      ============================================================ */
   UI.buildMap = function (s) {
     const prog = bossProgress(this.game);
+    const ex = this.game.getExploration ? this.game.getExploration() : {
+      pct: 0, found: 0, total: 44, outposts: 0, outpostsTotal: 12,
+      shrines: 0, shrinesTotal: 7, arenas: 0, arenasTotal: 18
+    };
+    const disc = this.game.discovery || { zones: {}, pois: {} };
     s.innerHTML = `
       <div class="modal-dim"></div>
       <div class="panel map-panel">
@@ -832,30 +837,39 @@
             <div class="eyebrow">CARTOGRAPHIE</div>
             <h2>LES SIX TERRES D'AURORE</h2>
           </div>
-          <div class="head-right"><button class="close-btn" id="map-close">✕</button></div>
+          <div class="head-right"><span class="map-pct">${ex.pct}% EXPLORÉ</span><button class="close-btn" id="map-close">✕</button></div>
         </div>
         <div class="map-body">
-          <canvas id="map-canvas" width="430" height="278"></canvas>
+          <canvas id="map-canvas" width="432" height="280"></canvas>
           <div class="map-side">
             <div class="map-progress">
               <div class="big-count">${prog.bigDone}<span>/6</span></div>
               <div class="big-label">GARDIENS VAINCUS</div>
             </div>
+            <div class="map-explore">
+              <div class="explore-top"><span>EXPLORATION</span><b>${ex.pct}%</b></div>
+              <div class="explore-bar"><i style="width:${ex.pct}%"></i></div>
+              <div class="explore-detail"><span>Avant-postes ${ex.outposts}/${ex.outpostsTotal}</span><span>Sanctuaires ${ex.shrines}/${ex.shrinesTotal}</span></div>
+            </div>
             <div class="map-legend">
               <div><i class="dot player"></i>Vous</div>
+              <div><i class="dot camp"></i>Avant-poste</div>
+              <div><i class="dot shrine"></i>Sanctuaire</div>
               <div><i class="dot mini"></i>Mini-boss</div>
               <div><i class="dot big"></i>Gardien</div>
               <div><i class="dot done"></i>Vaincu</div>
-              <div><i class="dot shrine"></i>Sanctuaire</div>
               <div><i class="dot final"></i>Monolithe</div>
             </div>
             <div class="map-zones">
-              ${D.ZONES.map(z => `<span style="border-color:${z.color}66"><i style="background:${z.color}"></i>${z.short}</span>`).join('')}
+              ${D.ZONES.map(z => {
+                const known = !!(disc.zones && disc.zones[z.id]);
+                return `<span class="${known ? '' : 'unknown'}" style="border-color:${known ? z.color + '66' : '#3a3344'}"><i style="background:${known ? z.color : '#4a4353'}"></i>${known ? z.short : '???'}</span>`;
+              }).join('')}
             </div>
-            <div class="map-tip">Les boss brillent sur la carte. Les sanctuaires soignent et sauvegardent.</div>
+            <div class="map-tip">Approchez-vous des avant-postes, sanctuaires et arènes pour les révéler. Les terres inconnues restent dans l'ombre.</div>
           </div>
         </div>
-        <div class="panel-foot"><span class="hint">M pour fermer · Le monde fait 480 × 480 tuiles.</span><span class="hint">${prog.done}/18 boss de zone vaincus</span></div>
+        <div class="panel-foot"><span class="hint">M pour fermer · 480 × 480 tuiles · 4× la carte d'origine</span><span class="hint">${prog.done}/18 boss · ${ex.found}/${ex.total} lieux</span></div>
       </div>
     `;
     s.querySelector('#map-close').addEventListener('click', () => this.close());
@@ -870,33 +884,60 @@
     const ctx = canvas.getContext('2d');
     const w = canvas.width, h = canvas.height;
     const game = this.game;
+    const disc = game.discovery || { zones: {}, pois: {} };
+    const known = (kind, id) => game.isDiscovered ? game.isDiscovered(kind, id) : false;
     ctx.fillStyle = '#0d1018';
     ctx.fillRect(0, 0, w, h);
-    game.world.drawMinimap(ctx, w, h);
+    game.world.drawMinimap(ctx, w, h, disc.zones || {});
     // voile
-    ctx.fillStyle = 'rgba(12,10,18,0.12)';
+    ctx.fillStyle = 'rgba(12,10,18,0.1)';
     ctx.fillRect(0, 0, w, h);
+    // grille de carte
+    ctx.strokeStyle = 'rgba(255,236,190,0.045)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i < 8; i++) {
+      const gx = Math.round(w * i / 8) + 0.5, gy = Math.round(h * i / 8) + 0.5;
+      ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, h); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke();
+    }
     const sx = w / D.WORLD_SIZE, sy = h / D.WORLD_SIZE;
     const tx = D.TILE;
     const px = (x) => (x / tx) * sx;
     const py = (y) => (y / tx) * sy;
 
-    // zones labels
+    // zones connues
     D.ZONES.forEach(z => {
       const x = px(z.anchor.x * tx + 8), y = py(z.anchor.y * tx + 8);
-      Art.drawText(ctx, z.short, x, y, z.color, 1, true, 'center');
-      Art.drawText(ctx, 'Nv ' + z.levelMin + '-' + z.levelMax, x, y + 9, '#e8dfc8', 1, true, 'center');
+      if (disc.zones && disc.zones[z.id]) {
+        Art.drawText(ctx, z.short, x, y, z.color, 1, true, 'center');
+        Art.drawText(ctx, 'Nv ' + z.levelMin + '-' + z.levelMax, x, y + 9, '#e8dfc8', 1, true, 'center');
+      } else {
+        Art.drawText(ctx, '?', x, y, '#6a6276', 2, true, 'center');
+      }
     });
 
-    // sanctuaires
+    // avant-postes découverts
+    game.world.outposts.forEach(o => {
+      if (!known('outpost', o.id)) return;
+      const x = Math.round(px(o.x)), y = Math.round(py(o.y));
+      ctx.fillStyle = '#8ef0a8';
+      ctx.fillRect(x - 2, y, 4, 2);
+      ctx.fillRect(x - 1, y - 2, 2, 3);
+      ctx.fillStyle = '#ffd76a';
+      ctx.fillRect(x + 2, y + 1, 1, 1);
+    });
+
+    // sanctuaires découverts
     game.world.shrines.forEach(sh => {
+      if (!known('shrine', sh.id)) return;
       ctx.fillStyle = '#8fe6e0';
       ctx.fillRect(px(sh.x) - 1, py(sh.y) - 3, 3, 7);
       ctx.fillRect(px(sh.x) - 3, py(sh.y) - 1, 7, 3);
     });
 
-    // arènes
+    // arènes découvertes
     game.world.arenas.forEach(a => {
+      if (!known('arena', a.id)) return;
       const x = px(a.x), y = py(a.y);
       const isBig = a.kind === 'big';
       const r = isBig ? 5 : 3;
@@ -913,13 +954,15 @@
       }
     });
 
-    // monolithe
-    const f = game.world.finalArena;
-    const fx = px(f.x), fy = px(f.y);
-    ctx.fillStyle = '#c08aff';
-    ctx.save(); ctx.translate(fx, fy); ctx.rotate(Math.PI / 4); ctx.fillRect(-4, -4, 8, 8); ctx.restore();
-    ctx.strokeStyle = 'rgba(200,145,255,0.65)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(fx, fy, 8 + Math.sin(this.editorTime * 3) * 2, 0, Math.PI * 2); ctx.stroke();
+    // monolithe, seulement s'il a été découvert
+    if (known('final', 'final')) {
+      const f = game.world.finalArena;
+      const fx = px(f.x), fy = py(f.y);
+      ctx.fillStyle = '#c08aff';
+      ctx.save(); ctx.translate(fx, fy); ctx.rotate(Math.PI / 4); ctx.fillRect(-4, -4, 8, 8); ctx.restore();
+      ctx.strokeStyle = 'rgba(200,145,255,0.65)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(fx, fy, 8 + Math.sin(this.editorTime * 3) * 2, 0, Math.PI * 2); ctx.stroke();
+    }
 
     // village
     const vx = px(game.world.village.x), vy = px(game.world.village.y);
@@ -927,8 +970,9 @@
     ctx.fillStyle = '#a8794b'; ctx.fillRect(vx - 3, vy - 3, 6, 6);
     ctx.fillStyle = '#79c8d6'; ctx.fillRect(vx - 1, vy - 1, 3, 3);
 
-    // joueur
-    const plx = px(game.player.x), ply = py(game.player.y);
+    // joueur (dans une maison : marqueur devant la porte)
+    const mapPos = game.interior && game.interiorReturn ? game.interiorReturn : game.player;
+    const plx = px(mapPos.x), ply = py(mapPos.y);
     const pulse = 4 + Math.sin(this.editorTime * 5) * 1.6;
     ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(plx, ply, pulse + 3, 0, Math.PI * 2); ctx.stroke();
@@ -1103,8 +1147,9 @@
       const ctx = c.getContext('2d');
       ctx.imageSmoothingEnabled = false;
       const img = opts.img;
-      const scale = Math.min(3, Math.floor(58 / img.width));
-      ctx.drawImage(img, 0, 0, img.width * scale, img.height * scale);
+      const scale = Math.max(1, Math.min(3, Math.floor(58 / img.width)));
+      const dw = img.width * scale, dh = img.height * scale;
+      ctx.drawImage(img, Math.floor((66 - dw) / 2), Math.max(1, Math.floor((84 - dh) / 2)), dw, dh);
       portrait.appendChild(c);
     } else {
       portrait.classList.add('empty');
@@ -1262,7 +1307,9 @@
 
     // panneau droit
     panel(ctx, 470, 8, 162, 40, 0.72);
-    const zone = game.currentZone();
+    const zone = game.interior
+      ? { short: game.interior.short, color: '#ffd8a0' }
+      : game.currentZone();
     Art.drawText(ctx, zone.short, 626, 14, zone.color, 1, true, 'right');
     Art.drawText(ctx, 'OR ' + p.gold, 478, 27, '#ffd76a', 1, true);
     const potTotal = (p.potions.petite || 0) + (p.potions.potion || 0) + (p.potions.elixir || 0);
@@ -1271,7 +1318,10 @@
 
     // aide contrôles
     ctx.globalAlpha = 0.72;
-    Art.drawText(ctx, 'J ATTAQUER   K ESQUIVER   E INTERAGIR   I SAC   M CARTE', 320, 347, '#e7ddc8', 1, true, 'center');
+    const hint = game.interior
+      ? 'E INTERAGIR   H POTION   I SAC   ÉCHAP MENU'
+      : 'J ATTAQUER   K ESQUIVER   E INTERAGIR   I SAC   M CARTE';
+    Art.drawText(ctx, hint, 320, 347, '#e7ddc8', 1, true, 'center');
     ctx.globalAlpha = 1;
 
     // boss
@@ -1295,8 +1345,9 @@
     if (game.prompt) {
       const text = game.prompt;
       const w = Art.textWidth(text, 1) + 20;
-      panel(ctx, 320 - w / 2, 286, w, 16, 0.8);
-      Art.drawText(ctx, text, 320, 290, '#ffebbe', 1, true, 'center');
+      const py = game.interior ? 318 : 286;
+      panel(ctx, 320 - w / 2, py, w, 16, 0.8);
+      Art.drawText(ctx, text, 320, py + 4, '#ffebbe', 1, true, 'center');
     }
 
     // toasts

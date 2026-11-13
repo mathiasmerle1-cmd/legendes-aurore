@@ -49,6 +49,13 @@
     discovery: null,
     discoveryClock: 0,
 
+    // Intérieurs : pièce active, fondu au noir et position de retour.
+    interior: null,
+    interiorFade: 0,
+    interiorFadeDir: 0,
+    interiorPending: null,
+    interiorReturn: null,
+
     /* ----------------------------------------------------------
        Démarrage
        ---------------------------------------------------------- */
@@ -122,6 +129,7 @@
 
       FX.update(dt, this);
       this.updateInput();
+      this.updateInteriorFade(dt);
 
       if (this.state === 'playing' && !this.paused) this.updatePlaying(dt);
 
@@ -181,6 +189,12 @@
     },
 
     updatePlaying(dt) {
+      if (this.interior) {
+        this.updateInteriorInteractTarget();
+        this.player.update(dt, this);
+        return;
+      }
+
       this.updateInteractTarget();
       this.player.update(dt, this);
       if (this.state !== 'playing' || this.paused) return;
@@ -195,7 +209,7 @@
     },
 
     updateCamera(dt) {
-      if (!this.player) return;
+      if (!this.player || this.interior) return;
       let lookX = 0, lookY = 0;
       if (this.state === 'playing' && !this.paused && !UI.isOpen()) {
         const aim = this.getAimWorld();
@@ -519,6 +533,11 @@
     },
 
     respawnPlayer() {
+      this.interior = null;
+      this.interiorFade = 0;
+      this.interiorFadeDir = 0;
+      this.interiorPending = null;
+      this.interiorReturn = null;
       const p = this.player;
       p.gold = Math.floor(p.gold * 0.8);
       p.hp = p.maxHp;
@@ -704,17 +723,24 @@
       defeated.final = !!this.world.finalArena.defeated;
       const chests = {};
       this.world.chests.forEach(c => { if (c.opened) chests[c.id] = true; });
+      const playerData = this.player.serialize();
+      // Une sauvegarde faite dans une maison reprend devant la porte.
+      if (this.interior && this.interiorReturn) {
+        playerData.x = this.interiorReturn.x;
+        playerData.y = this.interiorReturn.y;
+      }
       const data = {
-        version: 1,
+        version: 2,
         date: Date.now(),
-        zone: this.currentZone().id,
-        player: this.player.serialize(),
+        zone: this.interior ? this.zoneId : this.currentZone().id,
+        player: playerData,
         bosses: defeated,
         chests,
         lastSafe: this.player.lastSafe,
         lastShrine: this.lastShrine,
         shopStock: this.shopStock,
-        shopLevel: this.shopLevel
+        shopLevel: this.shopLevel,
+        discovery: this.discovery || this.freshDiscovery()
       };
       return U.storage.set(D.SAVE_KEY, data);
     },
@@ -746,12 +772,22 @@
         c.img = Art.chest(c.opened);
       });
       this.player = Entities.Player.deserialize(data.player, this.world.playerSpawn);
+      const oldMap = !data.version || data.version < 2;
       this.player.lastSafe = data.lastSafe || { x: this.world.playerSpawn.x, y: this.world.playerSpawn.y };
       this.lastShrine = data.lastShrine || "Sanctuaire d'Aurore";
-      if (!this.world.canStandAt(this.player.x, this.player.y, 10, 8)) {
+      if (oldMap || !this.world.canStandAt(this.player.x, this.player.y, 10, 8)) {
         this.player.x = this.world.playerSpawn.x;
         this.player.y = this.world.playerSpawn.y;
+        this.player.lastSafe = { x: this.player.x, y: this.player.y };
+        if (oldMap) this.toast('Carte agrandie : votre héros reprend au village.', '#ffe6a0');
       }
+      this.discovery = this.loadDiscovery(data.discovery);
+      this.discoveryClock = 0.8;
+      this.interior = null;
+      this.interiorFade = 0;
+      this.interiorFadeDir = 0;
+      this.interiorPending = null;
+      this.interiorReturn = null;
       this.shopStock = Array.isArray(data.shopStock) ? data.shopStock : null;
       this.shopLevel = data.shopLevel !== undefined ? data.shopLevel : -1;
       this.enemies = this.world.spawnPoints.map(sp => new Entities.Enemy(sp));
@@ -793,6 +829,13 @@
       });
       this.player.lastSafe = { x: spawn.x, y: spawn.y };
       this.lastShrine = "Sanctuaire d'Aurore";
+      this.discovery = this.freshDiscovery();
+      this.discoveryClock = 0.8;
+      this.interior = null;
+      this.interiorFade = 0;
+      this.interiorFadeDir = 0;
+      this.interiorPending = null;
+      this.interiorReturn = null;
       this.enemies = this.world.spawnPoints.map(sp => new Entities.Enemy(sp));
       this.projectiles = [];
       this.activeBoss = null;
@@ -836,6 +879,11 @@
 
     quitToTitle() {
       if (this.state === 'playing' && this.player && this.player.hp > 0) this.save();
+      this.interior = null;
+      this.interiorFade = 0;
+      this.interiorFadeDir = 0;
+      this.interiorPending = null;
+      this.interiorReturn = null;
       this.state = 'title';
       this.paused = false;
       this.activeBoss = null;
@@ -855,6 +903,7 @@
        Interactions
        ---------------------------------------------------------- */
     updateInteractTarget() {
+      if (this.interior) { this.updateInteriorInteractTarget(); return; }
       if (!this.player) { this.prompt = null; this.interactTarget = null; return; }
       const p = this.player;
       let best = null, bestD = 1e9;
@@ -879,14 +928,48 @@
         text = 'E  LIRE LE PANNEAU';
       } else if (best.kind === 'monolith') {
         text = this.bigBossesDefeated() >= 6 ? 'E  AFFRONTER NYX' : 'E  EXAMINER LE MONOLITHE';
+      } else if (best.kind === 'door') {
+        text = 'E  ENTRER';
       }
       this.prompt = text;
     },
 
+    updateInteriorInteractTarget() {
+      if (!this.interior || !this.player) {
+        this.prompt = null;
+        this.interactTarget = null;
+        return;
+      }
+      const p = this.player;
+      let best = null, bestD = 1e9;
+      for (const o of this.interior.interactables) {
+        const range = o.kind === 'exit' ? 32 : 36;
+        const d = U.dist(p.x, p.y, o.x, o.y);
+        if (d < range && d < bestD) { best = o; bestD = d; }
+      }
+      this.interactTarget = best;
+      if (!best) { this.prompt = null; return; }
+      if (best.kind === 'exit') this.prompt = 'E  SORTIR';
+      else this.prompt = 'E  ' + (best.action || 'EXAMINER') + ' · ' + best.name.toUpperCase();
+    },
+
     interact() {
+      if (this.interiorFadeDir) return;
+      if (this.interior) {
+        const it = this.interactTarget;
+        if (!it) return;
+        this.prompt = null;
+        if (it.kind === 'exit') { this.exitHouse(); return; }
+        window.AudioSys.sfx('click');
+        UI.showDialogue(it.name, it.lines, { img: it.img || null });
+        return;
+      }
+
       const t = this.interactTarget;
       if (!t) return;
       this.prompt = null;
+
+      if (t.kind === 'door') { this.enterHouse(t.house); return; }
 
       if (t.kind === 'npc') {
         if (t.role === 'shop') {
@@ -912,6 +995,130 @@
         return;
       }
       if (t.kind === 'monolith') { this.talkMonolith(t); return; }
+    },
+
+    /* ----------------------------------------------------------
+       Intérieurs : fondu au noir, pièces uniques, retour
+       ---------------------------------------------------------- */
+    enterHouse(house) {
+      if (!house || this.interior || this.interiorFadeDir) return;
+      this.prompt = null;
+      this.interactTarget = null;
+      this.interiorPending = { type: 'enter', house };
+      this.interiorFadeDir = 1;
+      window.AudioSys.sfx('click');
+    },
+
+    exitHouse() {
+      if (!this.interior || this.interiorFadeDir) return;
+      this.prompt = null;
+      this.interactTarget = null;
+      this.interiorPending = { type: 'exit' };
+      this.interiorFadeDir = 1;
+      window.AudioSys.sfx('click');
+    },
+
+    updateInteriorFade(dt) {
+      if (!this.interiorFadeDir) return;
+      const speed = 1 / 0.34;
+      this.interiorFade = U.clamp(this.interiorFade + this.interiorFadeDir * dt * speed, 0, 1);
+      if (this.interiorFadeDir > 0 && this.interiorFade >= 1) {
+        this.applyInteriorPending();
+        this.interiorFadeDir = -1;
+      } else if (this.interiorFadeDir < 0 && this.interiorFade <= 0) {
+        this.interiorFade = 0;
+        this.interiorFadeDir = 0;
+      }
+    },
+
+    applyInteriorPending() {
+      const pending = this.interiorPending;
+      this.interiorPending = null;
+      if (!pending) return;
+
+      if (pending.type === 'enter') {
+        const house = pending.house;
+        let rx = house.door.x;
+        let ry = house.door.y + 14;
+        if (!this.world.canStandAt(rx, ry, 10, 8)) {
+          const f = this.world.findFreeNear(
+            Math.floor(house.door.x / TILE),
+            Math.floor(house.door.y / TILE) + 1, 3, 0
+          );
+          rx = f.tx * TILE + 8;
+          ry = f.ty * TILE + 15;
+        }
+        this.interiorReturn = { x: rx, y: ry };
+
+        this.interior = window.Interiors.create(house);
+        this.player.x = this.interior.spawn.x;
+        this.player.y = this.interior.spawn.y;
+        this.player.facing = 0;
+        this.player.moving = false;
+        this.player.frame = 0;
+        this.player.walkTime = 0;
+        this.player.attackTimer = 0;
+        this.player.attackAnim = 0;
+        this.player.dodgeTimer = 0;
+        this.player.dustTimer = 0;
+        this.projectiles.length = 0;
+        this.fx.clear();
+        window.AudioSys.setTheme(this.interior.zoneId, false);
+        this.updateInteriorInteractTarget();
+      } else if (pending.type === 'exit') {
+        const ret = this.interiorReturn || this.world.playerSpawn;
+        this.interior = null;
+        this.interiorReturn = null;
+        this.player.x = ret.x;
+        this.player.y = ret.y;
+        this.player.facing = 0;
+        this.player.moving = false;
+        this.player.frame = 0;
+        this.player.walkTime = 0;
+        if (!this.world.canStandAt(this.player.x, this.player.y, 10, 8)) {
+          const s = this.world.playerSpawn;
+          this.player.x = s.x;
+          this.player.y = s.y;
+        }
+        this.player.lastSafe = { x: this.player.x, y: this.player.y };
+        this.snapCamera();
+        FX.setWeather(this.zoneId);
+        window.AudioSys.setTheme(this.zoneId, false);
+        this.updateInteractTarget();
+      }
+    },
+
+    moveEntity(e, dx, dy, footW, footH) {
+      if (this.interior) {
+        return window.Interiors.move(this.interior, e, dx, dy, footW, footH);
+      }
+      return this.world.moveEntity(e, dx, dy, footW, footH);
+    },
+
+    drawFade(ctx) {
+      if (this.interiorFade <= 0) return;
+      ctx.globalAlpha = this.interiorFade;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+      ctx.globalAlpha = 1;
+    },
+
+    drawInteriorMarker(ctx) {
+      const t = this.interactTarget;
+      if (!t || UI.isOpen() || this.state !== 'playing') return;
+      const scene = window.Interiors.SCENE;
+      const bob = Math.sin(this.time * 5) * 2;
+      const lift = t.kind === 'exit' ? 30 : 24;
+      const mx = Math.round(scene.OX + t.x);
+      const my = Math.round(scene.OY + t.y - lift + bob);
+      ctx.globalAlpha = 0.92;
+      ctx.fillStyle = 'rgba(17,14,23,0.8)';
+      ctx.fillRect(mx - 6, my - 5, 12, 12);
+      ctx.strokeStyle = '#ffd76a';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(mx - 5.5, my - 4.5, 11, 11);
+      Art.drawText(ctx, 'E', mx, my - 2, '#ffd76a', 1, false, 'center');
+      ctx.globalAlpha = 1;
     },
 
     talkAldric(npc) {
@@ -1072,6 +1279,13 @@
         UI.drawEditorBg(ctx, this.time);
         return;
       }
+      if (this.interior) {
+        window.Interiors.draw(ctx, this, this.time);
+        this.drawInteriorMarker(ctx);
+        if (this.state === 'playing') UI.drawHUD(ctx, this);
+        this.drawFade(ctx);
+        return;
+      }
       if (!this.world || !this.player) {
         ctx.fillStyle = '#0d1018';
         ctx.fillRect(0, 0, VIEW_W, VIEW_H);
@@ -1142,6 +1356,8 @@
       vg.addColorStop(1, 'rgba(8,6,12,0.34)');
       ctx.fillStyle = vg;
       ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+      this.drawFade(ctx);
     }
   };
 
