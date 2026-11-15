@@ -36,9 +36,9 @@
     finalUnlockAt: 0,
     sixSealsShown: false,
 
-    shopStock: null,
-    shopLevel: -1,
+    shopStocks: {},
     rewardQueue: [],
+    questDialogQueue: [],
     saveTimer: 0,
     zoneId: 'plains',
     zoneClock: 0,
@@ -62,6 +62,7 @@
     init() {
       this.input = new U.Input();
       this.world = new window.World(20260214);
+      if (window.Quests) window.Quests.init(this);
       UI.init(this);
       window.Game = this;
 
@@ -132,6 +133,7 @@
       this.updateInteriorFade(dt);
 
       if (this.state === 'playing' && !this.paused) this.updatePlaying(dt);
+      if (window.Quests) window.Quests.update(dt);
 
       this.updateCamera(dt);
       this.updateShake(dt);
@@ -178,6 +180,11 @@
         if (code === 'KeyI' || code === 'Tab') {
           this.prompt = null;
           UI.open('inventory', { from: null });
+          break;
+        }
+        if (code === 'KeyL') {
+          this.prompt = null;
+          UI.open('journal');
           break;
         }
         if (code === 'KeyM') {
@@ -469,6 +476,12 @@
       }
       this.player.kills++;
       if (!enemy.summoned) {
+        const zid = enemy.spawn && enemy.spawn.zoneId;
+        if (zid) {
+          if (!this.player.stats.killsByZone) this.player.stats.killsByZone = {};
+          this.player.stats.killsByZone[zid] = (this.player.stats.killsByZone[zid] || 0) + 1;
+        }
+        if (enemy.elite) this.player.stats.eliteKills = (this.player.stats.eliteKills || 0) + 1;
         const r = Math.random();
         if (r < 0.035) {
           this.player.addPotion('potion', 1);
@@ -476,8 +489,14 @@
         } else if (r < 0.16) {
           this.player.addPotion('petite', 1);
         }
+        const mat = enemy.species && enemy.species.material;
+        const matChance = (enemy.species && enemy.species.materialChance) || 0.4;
+        if (mat && Math.random() < matChance) {
+          this.player.addMaterial(mat, 1, this);
+        }
         if (enemy.elite) this.toast('ÉLITE VAINCU  +' + xp + ' XP', '#ffd76a');
       }
+      if (window.Quests) window.Quests.onKill(enemy);
       this.saveSoon();
     },
 
@@ -495,6 +514,9 @@
       if (def.loot) {
         this.player.addItem(def.loot, this);
         if (def.kind !== 'final') this.rewardQueue.push({ gearId: def.loot, title: 'BUTIN DE BOSS', at: this.time + 1.1 });
+      }
+      if (def.kind === 'big' || def.kind === 'final') {
+        this.player.addMaterial('eclat_sceau', def.kind === 'final' ? 3 : 1, this);
       }
 
       if (def.kind === 'final') {
@@ -514,6 +536,7 @@
         this.save();
         this.setBossMusic(false);
       }
+      if (window.Quests) window.Quests.onBoss(boss);
     },
 
     onPlayerDeath() {
@@ -614,6 +637,7 @@
       this.toast('DÉCOUVERT · ' + label, color || '#ffe6a0');
       if (this.player) this.fx.ring(this.player.x, this.player.y - 10, color || '#ffe6a0', 28, 0.55);
       if (kind === 'final') window.AudioSys.sfx('warp');
+      if (window.Quests) window.Quests.onDiscovery(kind, id);
       this.saveSoon();
       return true;
     },
@@ -679,36 +703,64 @@
       return this.world.arenas.filter(a => a.defeated && a.kind === 'big').length;
     },
 
-    getShopStock() {
+    getShopStock(vendorId) {
       const p = this.player;
       if (!p) return [];
+      const vid = vendorId && D.VENDORS[vendorId] ? vendorId : D.VILLAGE_VENDOR;
+      const v = D.VENDORS[vid];
       const tier = U.clamp(Math.floor((p.level - 1) / 4), 0, 5);
-      if (!this.shopStock || this.shopLevel !== tier) {
-        this.shopLevel = tier;
+      const key = vid + ':' + tier;
+      if (!this.shopStocks) this.shopStocks = {};
+      if (!this.shopStocks[key]) {
         const stock = [];
-        stock.push({ type: 'potion', id: 'petite', price: D.POTIONS.petite.price });
-        stock.push({ type: 'potion', id: 'potion', price: D.POTIONS.potion.price });
-        if (p.level >= 6) stock.push({ type: 'potion', id: 'elixir', price: D.POTIONS.elixir.price });
-        const rng = U.mulberry32(9001 + tier * 733);
+        const potions = v.potions || ['petite', 'potion'];
+        potions.forEach(id => {
+          const def = D.POTIONS[id];
+          if (def) stock.push({ type: 'potion', id, price: Math.max(1, Math.round(def.price * (v.markup || 1))) });
+        });
+
+        const chosen = [];
+        const used = new Set();
+        ((v.gear && v.gear.fixed) || []).forEach(id => {
+          const g = D.GEAR_BY_ID[id];
+          if (g && !used.has(id)) { used.add(id); chosen.push(g); }
+        });
+
+        let seed = 0;
+        for (let i = 0; i < vid.length; i++) seed = (seed * 31 + vid.charCodeAt(i)) >>> 0;
+        const rng = U.mulberry32(9001 + tier * 733 + seed);
+        const cfg = v.gear || {};
         const pool = D.GEAR.filter(g => {
-          if (g.rarity === 'legendary') return false;
+          if (used.has(g.id)) return false;
           if (D.STARTING_GEAR.includes(g.id)) return false;
-          if (g.req > p.level + 7) return false;
-          return g.tier >= Math.max(0, tier - 1) && g.tier <= Math.min(5, tier + 1);
+          if (g.rarity === 'legendary') return false;
+          if (g.req > p.level + 9) return false;
+          if (cfg.biomes && !cfg.biomes.includes(g.biome)) return false;
+          if (cfg.slots && !cfg.slots.includes(g.slot)) return false;
+          if (cfg.rarities && !cfg.rarities.includes(g.rarity)) return false;
+          return true;
         });
         U.shuffle(rng, pool);
-        const chosen = pool.slice(0, 6);
-        // une pièce plus ambitieuse pour donner envie d'économiser
-        const stretch = D.GEAR.find(g => g.tier === Math.min(5, tier + 1) && g.req <= p.level + 9 && !D.STARTING_GEAR.includes(g.id) && g.rarity !== 'legendary' && !chosen.includes(g));
-        if (stretch) chosen.push(stretch);
+        const target = Math.max(0, (cfg.count || 6) - chosen.length);
+        pool.slice(0, target).forEach(g => chosen.push(g));
+
         for (const g of chosen) {
-          const rm = { common: 1, uncommon: 1.35, rare: 2.1, epic: 3.2 }[g.rarity] || 1;
-          const price = Math.round((32 + g.tier * 92 + g.req * 13) * rm / 5) * 5;
+          const rm = { common: 1, uncommon: 1.35, rare: 2.1, epic: 3.2, legendary: 4.2 }[g.rarity] || 1;
+          const price = Math.round((32 + g.tier * 92 + g.req * 13) * rm * (v.markup || 1) / 5) * 5;
           stock.push({ type: 'gear', id: g.id, price });
         }
-        this.shopStock = stock;
+        this.shopStocks[key] = stock;
       }
-      return this.shopStock;
+      return this.shopStocks[key];
+    },
+
+    removeShopItem(vendorId, itemId) {
+      const vid = vendorId && D.VENDORS[vendorId] ? vendorId : D.VILLAGE_VENDOR;
+      if (!this.shopStocks) return;
+      Object.keys(this.shopStocks).forEach(key => {
+        if (key.indexOf(vid + ':') !== 0) return;
+        this.shopStocks[key] = this.shopStocks[key].filter(item => item.id !== itemId);
+      });
     },
 
     saveSoon() {
@@ -730,7 +782,7 @@
         playerData.y = this.interiorReturn.y;
       }
       const data = {
-        version: 2,
+        version: 3,
         date: Date.now(),
         zone: this.interior ? this.zoneId : this.currentZone().id,
         player: playerData,
@@ -738,9 +790,9 @@
         chests,
         lastSafe: this.player.lastSafe,
         lastShrine: this.lastShrine,
-        shopStock: this.shopStock,
-        shopLevel: this.shopLevel,
-        discovery: this.discovery || this.freshDiscovery()
+        shopStocks: this.shopStocks || {},
+        discovery: this.discovery || this.freshDiscovery(),
+        quests: window.Quests ? window.Quests.serialize() : null
       };
       return U.storage.set(D.SAVE_KEY, data);
     },
@@ -783,13 +835,14 @@
       }
       this.discovery = this.loadDiscovery(data.discovery);
       this.discoveryClock = 0.8;
+      if (window.Quests) window.Quests.load(data.quests);
+      this.questDialogQueue = [];
       this.interior = null;
       this.interiorFade = 0;
       this.interiorFadeDir = 0;
       this.interiorPending = null;
       this.interiorReturn = null;
-      this.shopStock = Array.isArray(data.shopStock) ? data.shopStock : null;
-      this.shopLevel = data.shopLevel !== undefined ? data.shopLevel : -1;
+      this.shopStocks = data.shopStocks && typeof data.shopStocks === 'object' ? data.shopStocks : {};
       this.enemies = this.world.spawnPoints.map(sp => new Entities.Enemy(sp));
       this.projectiles = [];
       this.activeBoss = null;
@@ -831,6 +884,8 @@
       this.lastShrine = "Sanctuaire d'Aurore";
       this.discovery = this.freshDiscovery();
       this.discoveryClock = 0.8;
+      if (window.Quests) window.Quests.reset();
+      this.questDialogQueue = [];
       this.interior = null;
       this.interiorFade = 0;
       this.interiorFadeDir = 0;
@@ -845,8 +900,7 @@
       this.victoryAt = 0;
       this.finalUnlockAt = 0;
       this.sixSealsShown = false;
-      this.shopStock = null;
-      this.shopLevel = -1;
+      this.shopStocks = {};
       this.introShown = false;
       this.zoneId = 'plains';
       this.zoneClock = 1;
@@ -872,6 +926,7 @@
       UI.showDialogue('Doyen Aldric', D.INTRO, {
         img: aldric ? aldric.img : null,
         onDone: () => {
+          if (window.Quests) window.Quests.onTalk('aldric');
           this.toast('OBJECTIF : vaincre les six Gardiens', '#ffd76a');
         }
       });
@@ -890,6 +945,7 @@
       this.activeArena = null;
       this.projectiles = [];
       this.rewardQueue = [];
+      this.questDialogQueue = [];
       this.victoryAt = 0;
       this.finalFight = false;
       this.prompt = null;
@@ -917,9 +973,12 @@
       if (!best) { this.prompt = null; return; }
       let text = 'E  INTERAGIR';
       if (best.kind === 'npc') {
-        if (best.role === 'shop') text = 'E  COMMERCER AVEC ' + best.name.toUpperCase();
+        const marker = window.Quests ? window.Quests.markerFor(best.id) : null;
+        if (marker === '?') text = 'E  REMETTRE LA QUÊTE À ' + best.name.toUpperCase();
+        else if (marker === '!') text = 'E  PARLER À ' + best.name.toUpperCase();
+        else if (best.role === 'shop') text = 'E  COMMERCER AVEC ' + best.name.toUpperCase();
         else if (best.role === 'smith') text = 'E  FORGER AVEC ' + best.name.toUpperCase();
-        else text = 'E  PARLER A ' + best.name.toUpperCase();
+        else text = 'E  PARLER À ' + best.name.toUpperCase();
       } else if (best.kind === 'shrine') {
         text = 'E  SE REPOSER ET SAUVEGARDER';
       } else if (best.kind === 'chest') {
@@ -972,17 +1031,24 @@
       if (t.kind === 'door') { this.enterHouse(t.house); return; }
 
       if (t.kind === 'npc') {
+        window.AudioSys.sfx('click');
+        if (t.id !== 'aldric') window.Quests.onTalk(t.id);
+        else window.Quests.onTalk('aldric');
+
+        const after = () => {
+          if (t.role === 'shop') UI.open('shop', { vendorId: t.vendorId || t.id });
+          else if (t.role === 'smith') UI.open('forge');
+        };
+        if (window.Quests.talkTo(t, { onDone: after })) return;
+
         if (t.role === 'shop') {
-          window.AudioSys.sfx('click');
-          UI.open('shop');
+          UI.open('shop', { vendorId: t.vendorId || t.id });
           return;
         }
         if (t.role === 'smith') {
-          window.AudioSys.sfx('click');
           UI.open('forge');
           return;
         }
-        window.AudioSys.sfx('click');
         if (t.id === 'aldric') this.talkAldric(t);
         else this.talkFlavor(t);
         return;
@@ -1121,6 +1187,30 @@
       ctx.globalAlpha = 1;
     },
 
+    drawQuestMarkers(ctx, rcX, rcY) {
+      if (!window.Quests || !window.Quests.initialized) return;
+      if (UI.isOpen() || this.state !== 'playing') return;
+      for (const npc of this.world.npcs) {
+        const marker = window.Quests.markerFor(npc.id);
+        if (!marker) continue;
+        const x = npc.x - rcX;
+        const y = npc.y - (npc.img ? npc.img.height : 24) - rcY;
+        if (x < -24 || x > VIEW_W + 24 || y < -36 || y > VIEW_H + 36) continue;
+        const color = marker === '?' ? '#8ef0a8' : '#ffd76a';
+        const bob = Math.sin(this.time * 4.5 + (npc.tx || 0)) * 2;
+        const bx = Math.round(x) - 6;
+        const by = Math.round(y - 20 + bob);
+        ctx.fillStyle = 'rgba(15,12,21,0.92)';
+        ctx.fillRect(bx, by, 13, 14);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(bx + 0.5, by + 0.5, 12, 13);
+        ctx.fillStyle = 'rgba(15,12,21,0.92)';
+        ctx.fillRect(bx + 5, by + 14, 3, 2);
+        Art.drawText(ctx, marker, bx + 7, by + 4, color, 1, true, 'center');
+      }
+    },
+
     talkAldric(npc) {
       const n = this.bigBossesDefeated();
       let lines;
@@ -1174,12 +1264,15 @@
       p.stamina = p.maxStamina;
       p.potionCd = 0;
       p.lastSafe = { x: p.x, y: p.y };
+      if (!p.stats.shrines) p.stats.shrines = {};
+      p.stats.shrines[shrine.id] = true;
       this.lastShrine = shrine.name;
       this.fx.heal(p.x, p.y - 18);
       this.fx.ring(p.x, p.y - 10, '#8fe6e0', 30, 0.8);
       window.AudioSys.sfx('save');
       UI.showBanner(shrine.name.toUpperCase(), 'REPOS · SAUVEGARDE', '#8fe6e0');
       this.toast('PV restaurés. Progression sauvegardée.', '#8ef0a8');
+      if (window.Quests) window.Quests.onShrine(shrine);
       this.save();
     },
 
@@ -1195,6 +1288,7 @@
       window.AudioSys.sfx('chest');
       this.fx.ring(chest.x, chest.y - 8, '#ffd76a', 24, 0.6);
       this.fx.burst(chest.x, chest.y - 10, '#ffd76a', 16, 100);
+      if (window.Quests) window.Quests.onChest(chest);
       this.saveSoon();
       UI.open('reward', {
         gearId: chest.loot,
@@ -1244,6 +1338,13 @@
       if (this.victoryAt && this.time >= this.victoryAt) {
         this.victoryAt = 0;
         if (this.state === 'playing') this.showVictory();
+      }
+      if (this.questDialogQueue.length && this.state === 'playing' && !this.paused && !UI.isOpen()) {
+        const qd = this.questDialogQueue[0];
+        if (this.time >= qd.at) {
+          this.questDialogQueue.shift();
+          UI.showDialogue('Chronique', ['QUÊTE ACCOMPLIE · ' + qd.title].concat(qd.lines), { speed: 34 });
+        }
       }
       if (this.rewardQueue.length && this.state === 'playing' && !this.paused && !UI.isOpen()) {
         const r = this.rewardQueue[0];
@@ -1331,6 +1432,7 @@
       for (const p of this.projectiles) p.draw(ctx, rcX, rcY, this.time);
       this.fx.drawOver(ctx, rcX, rcY, this.time);
       this.fx.drawWeather(ctx);
+      this.drawQuestMarkers(ctx, rcX, rcY);
 
       // marqueur d'interaction
       const t = this.interactTarget;

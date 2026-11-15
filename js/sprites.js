@@ -230,10 +230,10 @@
         const glyph = FONT[t[i]] || FONT['?'];
         for (let row = 0; row < 7; row++) {
           const bits = glyph[row];
-          for (let col = 0; col < 5; col++) {
-            if (bits & (1 << (4 - col))) {
+          for (let cx = 0; cx < 5; cx++) {
+            if (bits & (1 << (4 - cx))) {
               ctx.fillStyle = col;
-              ctx.fillRect(sx + ox + (i * 6 + col) * scale, y + oy + row * scale, scale, scale);
+              ctx.fillRect(sx + ox + (i * 6 + cx) * scale, y + oy + row * scale, scale, scale);
             }
           }
         }

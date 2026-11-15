@@ -18,19 +18,19 @@ Le jeu fonctionne hors ligne une fois la page chargée. La sauvegarde est stock�
 | H | Potion |
 | E / Entrée | Interagir |
 | I / Tab | Inventaire et équipement |
-| L | Journal (quêtes, bestiaire, succès) |
+| L | Journal des quêtes |
 | M | Carte du monde |
 | Échap | Pause |
 | N | Couper la musique |
 
 ## Contenu
 
-- Monde ouvert de 240 × 240 tuiles, 6 biomes.
+- Monde ouvert de 480 × 480 tuiles, 6 biomes.
 - Villages et avant-postes sûrs, 12 coffres répartis dans les camps.
 - 3 classes, éditeur de personnage, origines, équipement sur 5 slots.
 - Monstres nivelés, élites, mini-boss et 6 Gardiens de biome, boss final Nyx.
-- Quêtes principales et secondaires, bestiaire, succès.
-- Fabrication, amélioration, vendeurs, sanctuaires, sauvegarde locale.
+- 8 quêtes principales et 16 quêtes annexes, journal de quêtes sur `L`.
+- Matériaux de monstre, amélioration à la forge, vendeurs spécialisés, sanctuaires, sauvegarde locale.
 
 ## Développement
 

@@ -1033,7 +1033,7 @@
     ['H', 'Utiliser une potion'],
     ['E', 'Interagir / parler'],
     ['I / Tab', 'Inventaire et équipement'],
-    ['L', 'Journal : quêtes, bestiaire, succès'],
+    ['L', 'Journal des quêtes'],
     ['M', 'Carte du monde'],
     ['Échap', 'Pause'],
     ['N', 'Couper la musique']

@@ -20,6 +20,9 @@
     toasts: [],
     banner: null,
     selectedBagId: null,
+    selectedMaterialId: null,
+    selectedQuestId: null,
+    shopVendorId: null,
     shopMessage: '',
     forgeMessage: ''
   };
@@ -79,6 +82,40 @@
     return url;
   }
 
+  function materialURL(id) {
+    const key = 'material:' + id;
+    if (iconCache.has(key)) return iconCache.get(key);
+    const c = Art.materialIcon(id);
+    const url = c.toDataURL();
+    iconCache.set(key, url);
+    return url;
+  }
+
+  function materialEl(id, size) {
+    const img = new Image();
+    img.src = materialURL(id);
+    img.width = size;
+    img.height = size;
+    img.className = 'pixel-icon';
+    img.alt = '';
+    img.draggable = false;
+    return img;
+  }
+
+  function questStatusMeta(status) {
+    switch (status) {
+      case 'active': return { label: 'EN COURS', color: '#ffd76a' };
+      case 'ready': return { label: 'À RENDRE', color: '#8ef0a8' };
+      case 'done': return { label: 'ACCOMPLIE', color: '#91c9a2' };
+      default: return { label: 'À DÉCOUVRIR', color: '#9d91ad' };
+    }
+  }
+
+  function truncateText(text, max) {
+    text = String(text || '');
+    return text.length > max ? text.slice(0, Math.max(1, max - 2)) + '..' : text;
+  }
+
   function smallURL(kind) {
     const key = 'small:' + kind;
     if (iconCache.has(key)) return iconCache.get(key);
@@ -131,7 +168,8 @@
       case 'editor': this.buildEditor(s, data); this.game.paused = false; break;
       case 'pause': this.buildPause(s); break;
       case 'inventory': this.buildInventory(s); break;
-      case 'shop': this.buildShop(s); break;
+      case 'journal': this.buildJournal(s); break;
+      case 'shop': this.buildShop(s, data); break;
       case 'forge': this.buildForge(s); break;
       case 'map': this.buildMap(s); break;
       case 'help': this.buildHelp(s); break;
@@ -193,7 +231,7 @@
           <button class="pixel-btn ghost" id="btn-help">COMMANDES</button>
         </div>
         <div class="save-summary" id="save-summary"></div>
-        <div class="title-note">v1.0 · musique et graphismes procéduraux</div>
+        <div class="title-note">v1.1 · quêtes, journal et marchands</div>
       </div>
       <div class="title-badge">Cliquez pour activer le son</div>
     `;
@@ -420,6 +458,7 @@
         <div class="menu-list">
           <button class="pixel-btn primary" id="pu-resume">REPRENDRE</button>
           <button class="pixel-btn" id="pu-inventory">SAC & ÉQUIPEMENT</button>
+          <button class="pixel-btn" id="pu-journal">JOURNAL DES QUÊTES</button>
           <button class="pixel-btn" id="pu-map">CARTE DU MONDE</button>
           <button class="pixel-btn ghost" id="pu-help">COMMANDES</button>
           <button class="pixel-btn ghost" id="pu-save">SAUVEGARDER</button>
@@ -430,6 +469,7 @@
     `;
     s.querySelector('#pu-resume').addEventListener('click', () => this.close());
     s.querySelector('#pu-inventory').addEventListener('click', () => { window.AudioSys.sfx('click'); this.open('inventory', { from: 'pause' }); });
+    s.querySelector('#pu-journal').addEventListener('click', () => { window.AudioSys.sfx('click'); this.open('journal', { from: 'pause' }); });
     s.querySelector('#pu-map').addEventListener('click', () => { window.AudioSys.sfx('click'); this.open('map', { from: 'pause' }); });
     s.querySelector('#pu-help').addEventListener('click', () => { window.AudioSys.sfx('click'); this.open('help', { from: 'pause' }); });
     s.querySelector('#pu-save').addEventListener('click', () => {
@@ -466,6 +506,168 @@
   };
 
   /* ============================================================
+     Journal des quêtes
+     ============================================================ */
+  UI.buildJournal = function (s) {
+    s.innerHTML = `
+      <div class="modal-dim"></div>
+      <div class="panel wide journal-panel">
+        <div class="panel-head">
+          <div>
+            <div class="eyebrow">CHRONIQUE D'AURORE</div>
+            <h2>JOURNAL DES QUÊTES</h2>
+          </div>
+          <div class="head-right">
+            <div class="journal-summary" id="journal-summary"></div>
+            <button class="close-btn" id="journal-close">✕</button>
+          </div>
+        </div>
+        <div class="journal-body">
+          <div class="journal-list" id="journal-list"></div>
+          <div class="journal-detail" id="journal-detail"></div>
+        </div>
+        <div class="panel-foot">
+          <span class="hint">Cliquez : détails · Échap : fermer</span>
+          <span class="hint">Les annexes se rendent au donneur.</span>
+        </div>
+      </div>
+    `;
+    s.querySelector('#journal-close').addEventListener('click', () => this.close());
+    this.renderJournal(s);
+  };
+
+  UI.renderJournal = function (s) {
+    s = s || this.screenEl;
+    if (!s) return;
+    if (!window.Quests || !window.Quests.initialized) {
+      s.querySelector('#journal-list').innerHTML = '<div class="journal-empty">Le journal est encore vierge.</div>';
+      return;
+    }
+
+    const groups = window.Quests.journalGroups();
+    const sum = window.Quests.summary();
+    const summary = s.querySelector('#journal-summary');
+    if (summary) {
+      summary.innerHTML =
+        `<span><small>CAMPAGNE</small><b>${sum.mainDone}/${sum.mainTotal}</b></span>` +
+        `<span><small>ANNEXES</small><b>${sum.sideDone}/${sum.sideTotal}</b></span>` +
+        `<span><small>EN COURS</small><b>${sum.active}</b></span>`;
+    }
+
+    const all = groups.main.concat(groups.side);
+    if (!all.length) {
+      s.querySelector('#journal-list').innerHTML = '<div class="journal-empty">Aucune quête connue pour le moment.</div>';
+      this.renderJournalDetail();
+      return;
+    }
+
+    if (!this.selectedQuestId || !all.some(p => p.id === this.selectedQuestId)) {
+      const tracked = window.Quests.tracked();
+      const preferred = tracked || all.find(p => p.status === 'ready') ||
+        all.find(p => p.status === 'active') || all[0];
+      this.selectedQuestId = preferred ? preferred.id : null;
+    }
+
+    const list = s.querySelector('#journal-list');
+    clearNode(list);
+    const addSection = (label, packs) => {
+      if (!packs.length) return;
+      list.appendChild(el('div', 'section-label journal-section', label));
+      packs.forEach(pack => {
+        const meta = questStatusMeta(pack.status);
+        const card = el('button', 'journal-card status-' + pack.status +
+          (pack.id === this.selectedQuestId ? ' selected' : ''));
+        const sub = pack.status === 'ready'
+          ? 'À rendre à ' + pack.giver
+          : pack.status === 'locked'
+            ? (pack.objectives.length ? 'Offre de ' + pack.giver : 'Prochaine étape')
+            : pack.q.type === 'main' ? 'Campagne principale' : 'Quête annexe';
+        card.innerHTML =
+          `<span class="journal-card-title">${pack.q.title}</span>` +
+          `<span class="journal-card-meta"><em style="color:${meta.color}">${meta.label}</em><small>${sub}</small></span>`;
+        card.addEventListener('click', () => {
+          this.selectedQuestId = pack.id;
+          window.AudioSys.sfx('click');
+          this.renderJournal(s);
+        });
+        list.appendChild(card);
+      });
+    };
+
+    addSection('CAMPAGNE', groups.main);
+    addSection('ANNEXES', groups.side);
+    this.renderJournalDetail();
+  };
+
+  UI.renderJournalDetail = function () {
+    const s = this.screenEl;
+    if (!s) return;
+    const box = s.querySelector('#journal-detail');
+    if (!box) return;
+    if (!window.Quests || !window.Quests.initialized || !this.selectedQuestId) {
+      box.innerHTML = '<div class="detail-empty">Sélectionnez une quête pour en lire la chronique.</div>';
+      return;
+    }
+
+    const groups = window.Quests.journalGroups();
+    const pack = groups.main.concat(groups.side).find(p => p.id === this.selectedQuestId);
+    if (!pack) {
+      box.innerHTML = '<div class="detail-empty">Cette quête a quitté votre journal.</div>';
+      return;
+    }
+
+    const q = pack.q;
+    const meta = questStatusMeta(pack.status);
+    const lockedMain = pack.status === 'locked' && !pack.objectives.length;
+    const objectives = pack.objectives.length
+      ? pack.objectives.map(o => {
+          const pct = o.count > 0 ? Math.round((o.current / o.count) * 100) : 0;
+          return `<div class="journal-objective${o.done ? ' done' : ''}">` +
+            `<span class="obj-dot"></span>` +
+            `<span class="obj-body"><span class="obj-label">${o.label}</span>` +
+            `<span class="obj-bar"><i style="width:${pct}%"></i></span></span>` +
+            `<span class="obj-count">${o.current}/${o.count}</span></div>`;
+        }).join('')
+      : '<div class="journal-hint">Les objectifs seront révélés au démarrage de la quête.</div>';
+
+    const rewards = [];
+    const r = q.rewards || {};
+    if (r.xp) rewards.push(`<span><small>XP</small>+${r.xp}</span>`);
+    if (r.gold) rewards.push(`<span><small>OR</small>+${r.gold}</span>`);
+    if (r.potions) {
+      Object.keys(r.potions).forEach(kind => {
+        if (D.POTIONS[kind]) rewards.push(`<span><small>POTION</small>${D.POTIONS[kind].name} ×${r.potions[kind]}</span>`);
+      });
+    }
+    if (r.gear && D.GEAR_BY_ID[r.gear]) {
+      const g = D.GEAR_BY_ID[r.gear];
+      rewards.push(`<span class="reward-gear" style="border-color:${D.RARITIES[g.rarity].color}66">` +
+        `<small>ÉQUIPEMENT</small><b style="color:${D.RARITIES[g.rarity].color}">${g.name}</b></span>`);
+    }
+
+    let stateLine = '';
+    if (pack.status === 'ready') stateLine = `<div class="journal-state ready">À rendre à <b>${pack.giver}</b> pour recevoir les récompenses.</div>`;
+    else if (pack.status === 'done') stateLine = '<div class="journal-state done">Chronique consignée.</div>';
+    else if (lockedMain) stateLine = '<div class="journal-state locked">Cette étape se révélera une fois la précédente accomplie.</div>';
+    else if (pack.status === 'locked') stateLine = `<div class="journal-state locked">Parlez à <b>${pack.giver}</b> pour accepter cette quête.</div>`;
+
+    box.innerHTML = `
+      <div class="journal-detail-head">
+        <span class="journal-type">${q.type === 'main' ? 'QUÊTE PRINCIPALE' : 'QUÊTE ANNEXE'}</span>
+        <span class="journal-badge" style="color:${meta.color};border-color:${meta.color}55">${meta.label}</span>
+      </div>
+      <h3 class="journal-title">${q.title}</h3>
+      <div class="journal-giver">Donneur · <b>${pack.giver}</b></div>
+      <p class="journal-desc">${q.desc}</p>
+      <div class="section-label">OBJECTIFS</div>
+      <div class="journal-objectives">${objectives}</div>
+      <div class="section-label">RÉCOMPENSES</div>
+      <div class="journal-rewards">${rewards.length ? rewards.join('') : '<span><small>RÉCOMPENSE</small>La gratitude d\'Aurore</span>'}</div>
+      ${stateLine}
+    `;
+  };
+
+  /* ============================================================
      Inventaire
      ============================================================ */
   UI.buildInventory = function (s) {
@@ -489,7 +691,7 @@
             <div class="section-label">ÉQUIPÉ</div>
             <div class="equip-list" id="inv-equip"></div>
             <div class="section-label">STATISTIQUES</div>
-            <div class="stat-grid" id="inv-stats"></div>
+            <div class="stat-grid inv-stat-grid" id="inv-stats"></div>
           </div>
           <div class="inv-mid">
             <div class="section-label">POTIONS</div>
@@ -500,11 +702,13 @@
           <div class="inv-right">
             <div class="section-label">DÉTAILS</div>
             <div class="item-detail" id="inv-detail"></div>
+            <div class="section-label">MATÉRIAUX <span class="dim" id="inv-matcount"></span></div>
+            <div class="material-grid" id="inv-materials"></div>
           </div>
         </div>
         <div class="panel-foot">
           <span class="hint">Clic : sélectionner · Double-clic : équiper</span>
-          <span class="hint">Les objets équipés peuvent être remplacés depuis le sac.</span>
+          <span class="hint">Matériaux : cliquez pour examiner.</span>
         </div>
       </div>
     `;
@@ -520,17 +724,24 @@
     // équipement
     const eq = s.querySelector('#inv-equip');
     clearNode(eq);
-    ['weapon', 'armor', 'trinket'].forEach(slot => {
+    const slots = [
+      ['weapon', 'ARME'], ['armor', 'ARMURE'], ['trinket', 'TALISMAN'],
+      ['helm', 'CASQUE'], ['boots', 'BOTTES']
+    ];
+    slots.forEach(([slot, label]) => {
       const id = p.equipment[slot];
       const g = D.GEAR_BY_ID[id];
       const row = el('button', 'equip-slot' + (g ? '' : ' empty'));
-      const label = slot === 'weapon' ? 'ARME' : slot === 'armor' ? 'ARMURE' : 'TALISMAN';
       if (g) {
-        row.appendChild(iconEl(id, 26));
+        row.appendChild(iconEl(id, 22));
         const info = el('div', 'equip-info');
-        info.innerHTML = `<small>${label}</small><b style="color:${D.RARITIES[g.rarity].color}">${g.name}</b><span>${gearSummary(g)}</span>`;
+        info.innerHTML = `<small>${label}</small><b style="color:${D.RARITIES[g.rarity].color}">${g.name}</b>`;
         row.appendChild(info);
-        row.addEventListener('click', () => { this.selectedBagId = id; this.renderInventoryDetail(); });
+        row.addEventListener('click', () => {
+          this.selectedBagId = id;
+          this.selectedMaterialId = null;
+          this.renderInventoryDetail();
+        });
       } else {
         const info = el('div', 'equip-info');
         info.innerHTML = `<small>${label}</small><b class="dim">Vide</b>`;
@@ -542,12 +753,12 @@
     // stats
     const st = s.querySelector('#inv-stats');
     st.innerHTML = `
-      <div><span>PV</span><b>${Math.ceil(p.hp)} / ${p.maxHp}</b></div>
+      <div><span>PV</span><b>${Math.ceil(p.hp)}/${p.maxHp}</b></div>
       <div><span>ATQ</span><b>${Math.round(p.attackPower)}</b></div>
       <div><span>DEF</span><b>${Math.round(p.def)}</b></div>
       <div><span>VIT</span><b>${Math.round(p.moveSpeed)}</b></div>
-      <div><span>CRIT</span><b>${Math.round(p.crit * 100)} %</b></div>
-      <div><span>XP</span><b>${p.xp} / ${p.xpToNext()}</b></div>
+      <div><span>CRIT</span><b>${Math.round(p.crit * 100)}%</b></div>
+      <div><span>XP</span><b>${Math.round((p.xp / p.xpToNext()) * 100)}%</b></div>
     `;
 
     // potions
@@ -590,11 +801,40 @@
         cell.title = g.name + ' — ' + gearSummary(g);
         cell.addEventListener('click', () => {
           this.selectedBagId = id;
+          this.selectedMaterialId = null;
           this.renderInventoryDetail();
           this.renderInventory(s);
         });
         cell.addEventListener('dblclick', () => this.equipSelected(s));
         bag.appendChild(cell);
+      });
+    }
+
+    // matériaux
+    const matGrid = s.querySelector('#inv-materials');
+    clearNode(matGrid);
+    const owned = D.MATERIAL_LIST.filter(m => (p.materials[m.id] || 0) > 0);
+    const matTotal = owned.reduce((n, m) => n + (p.materials[m.id] || 0), 0);
+    const matCount = s.querySelector('#inv-matcount');
+    if (matCount) matCount.textContent = owned.length ? '(' + owned.length + ' · ' + matTotal + ')' : '';
+    if (!owned.length) {
+      matGrid.innerHTML = '<div class="material-empty">Aucun matériau.<br><span class="dim">Les monstres en lâchent parfois.</span></div>';
+    } else {
+      owned.forEach(m => {
+        const count = p.materials[m.id] || 0;
+        const cell = el('button', 'material-cell' + (this.selectedMaterialId === m.id ? ' selected' : ''));
+        cell.style.borderColor = m.color + '55';
+        cell.appendChild(materialEl(m.id, 20));
+        cell.appendChild(el('span', 'material-count', '×' + count));
+        cell.title = m.name + ' ×' + count + ' — ' + m.desc;
+        cell.addEventListener('click', () => {
+          this.selectedMaterialId = m.id;
+          this.selectedBagId = null;
+          window.AudioSys.sfx('click');
+          this.renderInventoryDetail();
+          this.renderInventory(s);
+        });
+        matGrid.appendChild(cell);
       });
     }
     this.renderInventoryDetail();
@@ -606,6 +846,24 @@
     const p = this.game.player;
     const box = s.querySelector('#inv-detail');
     if (!box) return;
+    const matId = this.selectedMaterialId;
+    if (matId && D.MATERIALS[matId]) {
+      const m = D.MATERIALS[matId];
+      const count = p.materials[matId] || 0;
+      const zone = D.ZONES.find(z => z.id === m.zone);
+      box.innerHTML = `
+        <div class="detail-icon"></div>
+        <b class="detail-name" style="color:${m.color}">${m.name}</b>
+        <span class="rarity" style="color:${m.color}">MATÉRIAU · ${zone ? zone.short : 'AURORE'} · ×${count}</span>
+        <p class="detail-desc">${m.desc}</p>
+        <div class="detail-stats">
+          <span class="good"><small>VALEUR</small>${m.value} or</span>
+        </div>
+      `;
+      box.querySelector('.detail-icon').appendChild(materialEl(matId, 36));
+      return;
+    }
+
     const id = this.selectedBagId;
     const g = id ? D.GEAR_BY_ID[id] : null;
 
@@ -624,7 +882,7 @@
         <div class="detail-stats">${gearStatChips(w).map(c => `<span class="${c.good ? 'good' : ''}"><small>${c.label}</small>${c.value}</span>`).join('')}</div>
       `;
       const iconHolder = box.querySelector('.detail-icon');
-      if (iconHolder) iconHolder.appendChild(iconEl(w.id, 44));
+      if (iconHolder) iconHolder.appendChild(iconEl(w.id, 36));
       return;
     }
 
@@ -659,7 +917,7 @@
           : `<button class="pixel-btn primary" id="inv-equip-btn">ÉQUIPER</button>`}
       </div>
     `;
-    box.querySelector('.detail-icon').appendChild(iconEl(id, 44));
+    box.querySelector('.detail-icon').appendChild(iconEl(id, 36));
     const btn = box.querySelector('#inv-equip-btn');
     if (btn) btn.addEventListener('click', () => this.equipSelected(this.screenEl));
   };
@@ -673,7 +931,9 @@
       window.AudioSys.sfx('pickup');
       this.game.toast(g.name + ' équipé.', D.RARITIES[g.rarity].color);
       this.selectedBagId = id;
+      this.selectedMaterialId = null;
       this.game.saveSoon();
+      if (window.Quests) window.Quests.onGear();
       this.renderInventory(s);
     }
   };
@@ -681,23 +941,26 @@
   /* ============================================================
      Boutique
      ============================================================ */
-  UI.buildShop = function (s) {
+  UI.buildShop = function (s, data) {
+    data = data || {};
     const p = this.game.player;
-    const stock = this.game.getShopStock();
+    const vendorId = data.vendorId && D.VENDORS[data.vendorId] ? data.vendorId : D.VILLAGE_VENDOR;
+    const v = D.VENDORS[vendorId];
+    this.shopVendorId = vendorId;
     s.innerHTML = `
       <div class="modal-dim"></div>
       <div class="panel shop-panel">
         <div class="panel-head">
           <div>
-            <div class="eyebrow">MARCHANDE</div>
-            <h2>MIRA LA MARCHANDE</h2>
+            <div class="eyebrow">${v.title || 'MARCHAND'}</div>
+            <h2>${v.name.toUpperCase()}</h2>
           </div>
           <div class="head-right">
             <span class="coin-line"><img src="${smallURL('coin')}" width="12" height="12"> ${p.gold}</span>
             <button class="close-btn" id="shop-close">✕</button>
           </div>
         </div>
-        <p class="npc-quote">« De l'eau claire, des potions fraîches, et quelques trouvailles. Le désert est loin, mon ami. »</p>
+        <p class="npc-quote">${v.quote || '« Regardez, mais ne touchez pas trop. »'}</p>
         <div class="shop-list" id="shop-list"></div>
         <div class="panel-foot">
           <span class="shop-msg" id="shop-msg">${this.shopMessage || ''}</span>
@@ -714,16 +977,24 @@
     if (!s) return;
     const p = this.game.player;
     const list = s.querySelector('#shop-list');
-    const stock = this.game.getShopStock();
+    const vendorId = this.shopVendorId || D.VILLAGE_VENDOR;
+    const stock = this.game.getShopStock(vendorId);
     clearNode(list);
+
+    if (!stock.length) {
+      list.innerHTML = '<div class="shop-empty">Le marchand n\'a plus rien à vendre aujourd\'hui.</div>';
+      return;
+    }
 
     stock.forEach(item => {
       const card = el('div', 'shop-card');
       if (item.type === 'potion') {
         const def = D.POTIONS[item.id];
+        if (!def) return;
         card.innerHTML = `<img src="${potionURL(item.id)}" width="28" height="28" alt=""><div class="shop-info"><b>${def.name}</b><small>${def.desc}</small></div><span class="price">${item.price} or</span>`;
       } else {
         const g = D.GEAR_BY_ID[item.id];
+        if (!g) return;
         card.innerHTML = `<span class="shop-icon-slot"></span><div class="shop-info"><b style="color:${D.RARITIES[g.rarity].color}">${g.name}</b><small>${gearSummary(g)}</small></div><span class="price">${item.price} or</span>`;
         card.querySelector('.shop-icon-slot').appendChild(iconEl(item.id, 28));
       }
@@ -735,8 +1006,8 @@
         if (item.type === 'potion') {
           p.addPotion(item.id, 1);
         } else {
-          p.bag.push(item.id);
-          this.game.shopStock = (this.game.shopStock || []).filter(x => x.id !== item.id);
+          p.addItem(item.id, this.game);
+          this.game.removeShopItem(vendorId, item.id);
         }
         this.shopMessage = item.type === 'potion' ? potionName(item.id) + ' achetée.' : D.GEAR_BY_ID[item.id].name + ' acheté.';
         window.AudioSys.sfx('buy');
@@ -744,7 +1015,8 @@
         const head = s.querySelector('.coin-line');
         if (head) head.innerHTML = `<img src="${smallURL('coin')}" width="12" height="12"> ${p.gold}`;
         this.renderShop(s);
-        s.querySelector('#shop-msg').textContent = this.shopMessage;
+        const msg = s.querySelector('#shop-msg');
+        if (msg) msg.textContent = this.shopMessage;
       });
       card.appendChild(buy);
       list.appendChild(card);
@@ -787,7 +1059,9 @@
     const rows = [
       { slot: 'weapon', label: 'ARME', bonus: '+2 ATQ par niveau' },
       { slot: 'armor', label: 'ARMURE', bonus: '+1 DEF et +2 PV par niveau' },
-      { slot: 'trinket', label: 'TALISMAN', bonus: '+5 PV par niveau' }
+      { slot: 'trinket', label: 'TALISMAN', bonus: '+5 PV par niveau' },
+      { slot: 'helm', label: 'CASQUE', bonus: '+1 DEF et +3 PV par niveau' },
+      { slot: 'boots', label: 'BOTTES', bonus: '+1 DEF et +2 VIT par niveau' }
     ];
     rows.forEach(r => {
       const id = p.equipment[r.slot];
@@ -804,10 +1078,12 @@
         if (maxed || !g || p.gold < cost) { window.AudioSys.sfx('error'); return; }
         p.gold -= cost;
         p.upgrades[r.slot] = lvl + 1;
+        p.stats.upgrades = (p.stats.upgrades || 0) + 1;
         p.recalc(false);
         this.forgeMessage = g.name + ' renforcé (' + (lvl + 1) + '/5).';
         window.AudioSys.sfx('save');
         this.game.fx.burst(p.x, p.y - 20, '#ffcf6a', 18, 120);
+        if (window.Quests) window.Quests.onUpgrade();
         this.game.saveSoon();
         const head = s.querySelector('.coin-line');
         if (head) head.innerHTML = `<img src="${smallURL('coin')}" width="12" height="12"> ${p.gold}`;
@@ -1217,6 +1493,11 @@
       if (this.modal === 'pause') { this.open('inventory', { from: 'pause' }); return true; }
       if (this.game.state === 'playing') { this.open('inventory', { from: null }); return true; }
     }
+    if (code === 'KeyL') {
+      if (this.modal === 'journal') { this.handleEscape(); return true; }
+      if (this.modal === 'pause') { this.open('journal', { from: 'pause' }); return true; }
+      if (this.game.state === 'playing') { this.open('journal'); return true; }
+    }
     if (code === 'KeyM') {
       if (this.modal === 'map') { this.handleEscape(); return true; }
       if (this.modal === 'pause') { this.open('map', { from: 'pause' }); return true; }
@@ -1316,11 +1597,28 @@
     Art.drawText(ctx, 'POTIONS ' + potTotal, 626, 27, '#f0b7c7', 1, true, 'right');
     Art.drawText(ctx, 'BOSS ' + game.bigBossesDefeated() + '/6', 478, 37, '#c9b6e8', 1, true);
 
+    // suivi compact de la quête active
+    const tracked = window.Quests && window.Quests.initialized ? window.Quests.tracked() : null;
+    if (tracked) {
+      const ready = tracked.status === 'ready';
+      const color = ready ? '#8ef0a8' : tracked.q.type === 'main' ? '#ffd76a' : '#9fdcff';
+      const label = ready ? 'QUÊTE À RENDRE' : tracked.q.type === 'main' ? 'QUÊTE PRINCIPALE' : 'QUÊTE ANNEXE';
+      const objective = ready
+        ? 'À rendre à ' + tracked.giver
+        : tracked.objective.label;
+      const count = ready ? '' : tracked.objective.current + '/' + tracked.objective.count;
+      panel(ctx, 470, 54, 162, 40, 0.74);
+      Art.drawText(ctx, label, 476, 59, color, 1, true);
+      Art.drawText(ctx, truncateText(tracked.q.title, 26), 476, 69, '#f4ecd9', 1, true);
+      Art.drawText(ctx, truncateText(objective, ready ? 26 : 20), 476, 79, ready ? '#bfe8c8' : '#c9bfa8', 1, true);
+      if (count) Art.drawText(ctx, count, 626, 79, '#c9bfa8', 1, true, 'right');
+    }
+
     // aide contrôles
     ctx.globalAlpha = 0.72;
     const hint = game.interior
-      ? 'E INTERAGIR   H POTION   I SAC   ÉCHAP MENU'
-      : 'J ATTAQUER   K ESQUIVER   E INTERAGIR   I SAC   M CARTE';
+      ? 'E INTERAGIR   H POTION   I SAC   L QUÊTES   ÉCHAP MENU'
+      : 'J ATTAQUER   K ESQUIVER   E INTERAGIR   I SAC   L QUÊTES   M CARTE';
     Art.drawText(ctx, hint, 320, 347, '#e7ddc8', 1, true, 'center');
     ctx.globalAlpha = 1;
 

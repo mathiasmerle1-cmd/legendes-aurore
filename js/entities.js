@@ -38,6 +38,16 @@
       this.materials = {};
       this.potions = { petite: 3, potion: 1, elixir: 0 };
       this.upgrades = { weapon: 0, armor: 0, trinket: 0, helm: 0, boots: 0 };
+      // Compteurs persistants utilisés par les quêtes et les succès.
+      this.stats = {
+        materialsCollected: 0,
+        eliteKills: 0,
+        killsByZone: {},
+        shrines: {},
+        talks: {},
+        upgrades: 0,
+        questsDone: 0
+      };
       this.facing = 0;
       this.frame = 0;
       this.walkTime = 0;
@@ -120,6 +130,7 @@
       if (this.bag.includes(id)) this.bag.push(id);
       else this.bag.push(id);
       if (game) game.toast(g.name + ' obtenu !', D.RARITIES[g.rarity].color);
+      if (window.Quests) window.Quests.onGear();
       return true;
     }
 
@@ -133,6 +144,7 @@
       this.equipment[slot] = id;
       if (old) this.bag.push(old);
       this.recalc(false);
+      if (window.Quests) window.Quests.onGear();
       return true;
     }
 
@@ -142,11 +154,27 @@
       this.equipment[slot] = null;
       this.bag.push(id);
       this.recalc(false);
+      if (window.Quests) window.Quests.onGear();
       return true;
     }
 
     addPotion(kind, n) {
       this.potions[kind] = (this.potions[kind] || 0) + (n || 1);
+    }
+
+    addMaterial(id, n, game) {
+      const m = D.MATERIALS[id];
+      if (!m) return false;
+      n = Math.max(1, n || 1);
+      this.materials[id] = (this.materials[id] || 0) + n;
+      if (!this.stats) this.stats = {};
+      this.stats.materialsCollected = (this.stats.materialsCollected || 0) + n;
+      if (game) {
+        game.toast(m.name + ' +' + n, m.color);
+        window.AudioSys.sfx('pickup');
+      }
+      if (window.Quests) window.Quests.onMaterial(id, n);
+      return true;
     }
 
     potionKindToUse() {
@@ -366,6 +394,7 @@
         name: this.name, classId: this.classId, look: this.look,
         level: this.level, xp: this.xp, hp: this.hp, gold: this.gold,
         equipment: this.equipment, bag: this.bag, potions: this.potions,
+        materials: this.materials, stats: this.stats,
         upgrades: this.upgrades, x: this.x, y: this.y,
         kills: this.kills, playTime: this.playTime
       };
@@ -382,7 +411,21 @@
       p.equipment = Object.assign({}, D.STARTING[p.classId], data.equipment || {});
       p.bag = (data.bag || []).filter(id => D.GEAR_BY_ID[id]);
       p.potions = Object.assign({ petite: 3, potion: 1, elixir: 0 }, data.potions || {});
-      p.upgrades = Object.assign({ weapon: 0, armor: 0, trinket: 0 }, data.upgrades || {});
+      p.upgrades = Object.assign({ weapon: 0, armor: 0, trinket: 0, helm: 0, boots: 0 }, data.upgrades || {});
+      const materials = {};
+      Object.keys(data.materials || {}).forEach(id => {
+        if (D.MATERIALS[id]) materials[id] = Math.max(0, Math.floor(Number(data.materials[id]) || 0));
+      });
+      p.materials = materials;
+      const savedStats = data.stats || {};
+      p.stats = Object.assign({}, p.stats, savedStats);
+      p.stats.killsByZone = Object.assign({}, savedStats.killsByZone || {});
+      p.stats.shrines = Object.assign({}, savedStats.shrines || {});
+      p.stats.talks = Object.assign({}, savedStats.talks || {});
+      p.stats.materialsCollected = Math.max(0, Math.floor(Number(savedStats.materialsCollected) || 0));
+      p.stats.eliteKills = Math.max(0, Math.floor(Number(savedStats.eliteKills) || 0));
+      p.stats.upgrades = Math.max(0, Math.floor(Number(savedStats.upgrades) || 0));
+      p.stats.questsDone = Math.max(0, Math.floor(Number(savedStats.questsDone) || 0));
       p.kills = data.kills || 0;
       p.playTime = data.playTime || 0;
       p.recalc(true);
