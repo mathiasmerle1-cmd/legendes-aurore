@@ -13,6 +13,21 @@
   const SPECIAL_NONE = 0, SPECIAL_WATER = 1, SPECIAL_LAVA = 2, SPECIAL_BRIDGE = 3;
   const SEED = 20260214;
 
+  /* Palette de la carte : plus contrastée que le terrain en jeu pour
+     rester lisible à petite échelle, avec des teintes de relief. */
+  const MAP_PAL = {
+    plains: { base: '#7db75a', light: '#9ed274', dark: '#5e9847', deep: '#487c3b', road: '#c9aa75', roadDark: '#9d7d4f', coast: '#e2d6a0', water: '#4f9bb4' },
+    forest: { base: '#407a4b', light: '#5b9557', dark: '#2f603b', deep: '#244c31', road: '#a88a5c', roadDark: '#7c633f', coast: '#a9b98a', water: '#427d8a' },
+    desert: { base: '#d7b86e', light: '#f0d695', dark: '#bc9854', deep: '#9c7c42', road: '#e3c17a', roadDark: '#b8934f', coast: '#f5e6b3', water: '#4c9cad' },
+    swamp: { base: '#617b52', light: '#7e9868', dark: '#4a6341', deep: '#395034', road: '#957e56', roadDark: '#6d5c3e', coast: '#a1ad7c', water: '#466759' },
+    tundra: { base: '#cfdfe6', light: '#ecf6fa', dark: '#b2c9d4', deep: '#95b1c0', road: '#bbb6a5', roadDark: '#8f8b7c', coast: '#f7fdff', water: '#80b8c9' },
+    volcano: { base: '#5f4a45', light: '#806055', dark: '#483635', deep: '#362829', road: '#715c4f', roadDark: '#4f4039', coast: '#8c6b5d', water: '#3e6a71' }
+  };
+  const MAP_WATER = {
+    shallow: '#65b4c4', mid: '#3f819a', deep: '#285b76', foam: '#c3eaec',
+    lavaShallow: '#e4753f', lavaMid: '#bd502e', lavaDeep: '#8b3424', lavaFoam: '#ffd06a'
+  };
+
   function key(x, y) { return y * W + x; }
   function inBounds(x, y) { return x >= 0 && y >= 0 && x < W && y < H; }
 
@@ -915,7 +930,7 @@
       const ty1 = Math.max(0, Math.floor(camY / TS) - 1);
       const tx2 = Math.min(W - 1, Math.ceil((camX + vw) / TS) + 1);
       const ty2 = Math.min(H - 1, Math.ceil((camY + vh) / TS) + 1);
-      const wf = Math.floor(time * 2) % 2;
+      const wf = Math.floor(time * 2.6) % 3;
       for (let ty = ty1; ty <= ty2; ty++) {
         for (let tx = tx1; tx <= tx2; tx++) {
           const x = tx * TS - camX, y = ty * TS - camY;
@@ -934,8 +949,68 @@
             ctx.drawImage(Art.bridgeTile(mask, !!vertical), Math.round(x), Math.round(y));
           } else {
             ctx.drawImage(Art.groundTile(bi, this.variant[k]), Math.round(x), Math.round(y));
+            // lisières organiques : un dégradé de pixels du biome voisin
+            if (!this.path[k]) {
+              const selfBi = this.biome[k];
+              const edge = (nx, ny, dir) => {
+                if (!inBounds(nx, ny)) return;
+                const nk = key(nx, ny);
+                const nsp = this.special[nk];
+                if (nsp === SPECIAL_BRIDGE) return;
+                let to = null;
+                if (nsp === SPECIAL_WATER) to = 'water';
+                else if (nsp === SPECIAL_LAVA) to = 'lava';
+                else if (this.biome[nk] !== selfBi) to = D.ZONES[this.biome[nk]].id;
+                if (to) ctx.drawImage(Art.edgeTile(bi, to, dir), Math.round(x), Math.round(y));
+              };
+              edge(tx, ty - 1, 0);
+              edge(tx + 1, ty, 1);
+              edge(tx, ty + 1, 2);
+              edge(tx - 1, ty, 3);
+            }
             if (this.path[k]) {
               ctx.drawImage(Art.pathTile(bi, this.pathMask(tx, ty)), Math.round(x), Math.round(y));
+            }
+          }
+        }
+      }
+      // Reflets mobiles à la surface de l'eau et de la lave.
+      const shimmer = Math.floor(time * 14);
+      for (let ty = ty1; ty <= ty2; ty++) {
+        for (let tx = tx1; tx <= tx2; tx++) {
+          const k = key(tx, ty);
+          const sp = this.special[k];
+          if (sp !== SPECIAL_WATER && sp !== SPECIAL_LAVA) continue;
+          const ph = U.hash2(tx, ty, this.seed + 41) * Math.PI * 2;
+          const pulse = Math.sin(time * 2.2 + ph);
+          if (pulse >= 0.15) {
+            const ox = 2 + Math.floor(U.hash2(tx, ty, 91) * 12);
+            const oy = 2 + Math.floor(U.hash2(tx, ty, 157) * 12);
+            ctx.fillStyle = sp === SPECIAL_WATER
+              ? 'rgba(220,248,255,' + (0.12 + pulse * 0.3) + ')'
+              : 'rgba(255,214,126,' + (0.12 + pulse * 0.34) + ')';
+            ctx.fillRect(Math.round(tx * TS - camX + ox), Math.round(ty * TS - camY + oy), sp === SPECIAL_WATER ? 3 : 2, 1);
+            if (shimmer % 2 === 0 && U.hash2(tx, ty, this.seed + shimmer) > 0.55) {
+              ctx.fillRect(Math.round(tx * TS - camX + 15 - ox), Math.round(ty * TS - camY + 15 - oy), 1, 1);
+            }
+          }
+          // Écume qui lèche les rives : de petites crêtes glissent contre la terre.
+          if (sp === SPECIAL_WATER) {
+            const surf = Math.sin(time * 2.1 + tx * 0.8 + ty * 1.3);
+            if (surf > -0.45) {
+              const a = (0.08 + (surf * 0.5 + 0.5) * 0.17).toFixed(3);
+              ctx.fillStyle = 'rgba(228,250,255,' + a + ')';
+              const bx = Math.round(tx * TS - camX), by = Math.round(ty * TS - camY);
+              const slide = Math.floor((0.5 + 0.5 * Math.sin(time * 1.7 + ph)) * 9);
+              const nTop = ty > 0 ? this.special[key(tx, ty - 1)] : -1;
+              const nRight = tx < W - 1 ? this.special[key(tx + 1, ty)] : -1;
+              const nBottom = ty < H - 1 ? this.special[key(tx, ty + 1)] : -1;
+              const nLeft = tx > 0 ? this.special[key(tx - 1, ty)] : -1;
+              const land = (v) => v !== SPECIAL_WATER && v !== SPECIAL_LAVA;
+              if (land(nTop)) ctx.fillRect(bx + 2 + slide, by + 2, 3, 1);
+              if (land(nBottom)) ctx.fillRect(bx + 11 - slide, by + 13, 3, 1);
+              if (land(nLeft)) ctx.fillRect(bx + 2, by + 11 - slide, 1, 3);
+              if (land(nRight)) ctx.fillRect(bx + 13, by + 2 + slide, 1, 3);
             }
           }
         }
@@ -957,6 +1032,237 @@
           Math.round(d.y - hh + (d.oy || 0) - camY)
         );
       }
+    }
+
+    /* ----------------------------------------------------------
+       Carte détaillée : relief, côtes, forêts et lieux
+       ---------------------------------------------------------- */
+    buildMapTexture() {
+      if (this.mapTexture) return this.mapTexture;
+      const S = W;
+      const canvas = Art.cvs(S, S);
+      const ctx = canvas.getContext('2d');
+      const image = ctx.createImageData(S, S);
+      const px = image.data;
+      const heights = new Float32Array(S * S);
+      const depth = new Int16Array(S * S);
+
+      const pal = {};
+      D.ZONES.forEach(z => {
+        const p = MAP_PAL[z.id];
+        pal[z.index] = {
+          base: U.hexRgb(p.base), light: U.hexRgb(p.light), dark: U.hexRgb(p.dark),
+          deep: U.hexRgb(p.deep), road: U.hexRgb(p.road), roadDark: U.hexRgb(p.roadDark),
+          coast: U.hexRgb(p.coast)
+        };
+      });
+      const mix = (a, b, t) => [
+        a[0] + (b[0] - a[0]) * t,
+        a[1] + (b[1] - a[1]) * t,
+        a[2] + (b[2] - a[2]) * t
+      ];
+      const waterPal = {
+        shallow: U.hexRgb(MAP_WATER.shallow), mid: U.hexRgb(MAP_WATER.mid),
+        deep: U.hexRgb(MAP_WATER.deep), foam: U.hexRgb(MAP_WATER.foam)
+      };
+      const lavaPal = {
+        shallow: U.hexRgb(MAP_WATER.lavaShallow), mid: U.hexRgb(MAP_WATER.lavaMid),
+        deep: U.hexRgb(MAP_WATER.lavaDeep), foam: U.hexRgb(MAP_WATER.lavaFoam)
+      };
+      const isWater = (k) => this.special[k] === SPECIAL_WATER || this.special[k] === SPECIAL_LAVA;
+
+      // Relief doux : deux échelles de bruit suffisent à lire les vallées.
+      for (let y = 0; y < S; y++) {
+        for (let x = 0; x < S; x++) {
+          const k = y * S + x;
+          const broad = U.fbm(x * 0.014, y * 0.014, this.seed + 311, 2);
+          const fine = U.fbm(x * 0.058, y * 0.058, this.seed + 1201, 2);
+          heights[k] = broad * 0.7 + fine * 0.3;
+        }
+      }
+
+      // Profondeur des eaux, par propagation depuis les rives.
+      const queue = [];
+      for (let y = 0; y < S; y++) {
+        for (let x = 0; x < S; x++) {
+          const k = y * S + x;
+          if (!isWater(k)) continue;
+          let shore = false;
+          if (x > 0 && !isWater(k - 1)) shore = true;
+          else if (x < S - 1 && !isWater(k + 1)) shore = true;
+          else if (y > 0 && !isWater(k - S)) shore = true;
+          else if (y < S - 1 && !isWater(k + S)) shore = true;
+          if (shore) { depth[k] = 1; queue.push(k); }
+        }
+      }
+      for (let qi = 0; qi < queue.length; qi++) {
+        const k = queue[qi];
+        const d = depth[k];
+        if (d >= 8) continue;
+        const x = k % S, y = (k / S) | 0;
+        const add = (nk) => {
+          if (isWater(nk) && depth[nk] === 0) { depth[nk] = d + 1; queue.push(nk); }
+        };
+        if (x > 0) add(k - 1);
+        if (x < S - 1) add(k + 1);
+        if (y > 0) add(k - S);
+        if (y < S - 1) add(k + S);
+      }
+
+      // Couleurs de base : terres, routes et eaux.
+      for (let y = 0; y < S; y++) {
+        for (let x = 0; x < S; x++) {
+          const k = y * S + x;
+          const i = k * 4;
+          const sp = this.special[k];
+          const p = pal[this.biome[k]] || pal[0];
+          let c;
+          if (sp === SPECIAL_WATER || sp === SPECIAL_LAVA) {
+            const wp = sp === SPECIAL_LAVA ? lavaPal : waterPal;
+            const d = U.clamp(depth[k] || 8, 1, 8);
+            const t = (d - 1) / 7;
+            c = mix(wp.shallow, wp.mid, U.clamp(t * 2, 0, 1));
+            c = mix(c, wp.deep, U.clamp((t - 0.5) * 2, 0, 1));
+            if (d === 1) c = mix(c, wp.foam, 0.5);
+            else if (U.hash2(x, y, this.seed + 9) > 0.9) c = mix(c, wp.foam, 0.32);
+          } else if (this.path[k]) {
+            const road = mix(p.road, p.roadDark, U.hash2(x, y, this.seed + 17) * 0.4);
+            let border = false;
+            if (x > 0 && !this.path[k - 1] && !isWater(k - 1)) border = true;
+            else if (x < S - 1 && !this.path[k + 1] && !isWater(k + 1)) border = true;
+            else if (y > 0 && !this.path[k - S] && !isWater(k - S)) border = true;
+            else if (y < S - 1 && !this.path[k + S] && !isWater(k + S)) border = true;
+            c = border ? mix(road, p.roadDark, 0.55) : road;
+            if (sp === SPECIAL_BRIDGE) c = mix(c, U.hexRgb('#9a7448'), 0.7);
+          } else {
+            const t = U.clamp((heights[k] - 0.3) * 1.8, 0, 1);
+            c = mix(p.dark, p.base, U.clamp(t * 2, 0, 1));
+            c = mix(c, p.light, U.clamp((t - 0.5) * 1.7, 0, 1));
+            const grain = U.hash2(x, y, this.seed + 35);
+            if (grain > 0.94) c = mix(c, p.light, 0.34);
+            else if (grain < 0.06) c = mix(c, p.dark, 0.26);
+            // Courbes de niveau : de fins anneaux plus sombres lisent le relief.
+            const band = Math.floor(heights[k] * 12);
+            if ((x > 0 && Math.floor(heights[k - 1] * 12) !== band) ||
+                (x < S - 1 && Math.floor(heights[k + 1] * 12) !== band) ||
+                (y > 0 && Math.floor(heights[k - S] * 12) !== band) ||
+                (y < S - 1 && Math.floor(heights[k + S] * 12) !== band)) {
+              c = mix(c, p.deep, 0.2);
+            }
+            let coast = false;
+            if (x > 0 && isWater(k - 1)) coast = true;
+            else if (x < S - 1 && isWater(k + 1)) coast = true;
+            else if (y > 0 && isWater(k - S)) coast = true;
+            else if (y < S - 1 && isWater(k + S)) coast = true;
+            if (coast) c = mix(c, p.coast, 0.46);
+          }
+          px[i] = U.clamp(c[0], 0, 255);
+          px[i + 1] = U.clamp(c[1], 0, 255);
+          px[i + 2] = U.clamp(c[2], 0, 255);
+          px[i + 3] = 255;
+        }
+      }
+
+      // Ombres portées du relief, orientées nord-ouest.
+      for (let y = 1; y < S - 1; y++) {
+        for (let x = 1; x < S - 1; x++) {
+          const k = y * S + x;
+          if (isWater(k) || this.path[k]) continue;
+          const slope = (heights[k - 1] - heights[k + 1]) + (heights[k - S] - heights[k + S]);
+          const shade = U.clamp(slope * 620, -16, 17);
+          if (Math.abs(shade) < 0.4) continue;
+          const i = k * 4;
+          px[i] = U.clamp(px[i] + shade * 1.15, 0, 255);
+          px[i + 1] = U.clamp(px[i + 1] + shade, 0, 255);
+          px[i + 2] = U.clamp(px[i + 2] + shade * 0.86, 0, 255);
+        }
+      }
+      ctx.putImageData(image, 0, 0);
+
+      // Canopées et rochers : quelques pixels suffisent à donner du grain.
+      const treeCol = {
+        plains: '#3a6937', forest: '#285233', desert: '#47713b', swamp: '#345039',
+        tundra: '#3d6353', volcano: '#342b2b'
+      };
+      for (const d of this.decor) {
+        const mx = d.x / TS, my = d.y / TS;
+        const cx = Math.round(mx), cy = Math.round(my);
+        if (d.type === 'tree') {
+          const tx = U.clamp(Math.floor(mx), 0, S - 1), ty = U.clamp(Math.floor(my), 0, S - 1);
+          const zone = D.ZONES[this.biome[ty * S + tx]];
+          ctx.fillStyle = treeCol[zone.id] || treeCol.forest;
+          ctx.fillRect(cx - 1, cy - 2, 2, 3);
+          ctx.fillRect(cx, cy - 3, 1, 1);
+          ctx.fillStyle = U.shade(treeCol[zone.id] || treeCol.forest, 24);
+          ctx.fillRect(cx, cy - 2, 1, 1);
+        } else if (d.type === 'bush') {
+          ctx.fillStyle = 'rgba(45,86,44,0.8)';
+          ctx.fillRect(cx, cy - 1, 1, 1);
+        } else if (d.type === 'rock' || d.type === 'lava-rock') {
+          ctx.fillStyle = d.type === 'lava-rock' ? '#3a2c2b' : '#7d7d74';
+          ctx.fillRect(cx - 1, cy - 1, 2, 1);
+          ctx.fillStyle = '#a4a294';
+          ctx.fillRect(cx - 1, cy - 1, 1, 1);
+        } else if (d.type === 'cactus') {
+          ctx.fillStyle = '#3c6f3d';
+          ctx.fillRect(cx, cy - 2, 1, 2);
+        } else if (d.type === 'crystal') {
+          ctx.fillStyle = '#bdf3ff';
+          ctx.fillRect(cx, cy - 1, 1, 1);
+        } else if (d.type === 'obsidian' || d.type === 'dead-tree') {
+          ctx.fillStyle = '#2c2528';
+          ctx.fillRect(cx, cy - 2, 1, 2);
+        }
+      }
+
+      // Clairières des lieux importants.
+      const disc = (x, y, r, fill, stroke) => {
+        if (fill) {
+          ctx.fillStyle = fill;
+          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+        }
+        if (stroke) {
+          ctx.strokeStyle = stroke; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+        }
+      };
+      disc(this.village.tx, this.village.ty, 23, 'rgba(243,222,170,0.4)', 'rgba(118,88,55,0.5)');
+      this.houses.forEach(h => {
+        ctx.fillStyle = '#6d4b31';
+        ctx.fillRect(h.tx - 3, h.ty - 2, 6, 4);
+        ctx.fillStyle = '#c69a64';
+        ctx.fillRect(h.tx - 2, h.ty - 2, 4, 1);
+        ctx.fillStyle = '#7c5734';
+        ctx.fillRect(h.tx - 3, h.ty + 1, 6, 1);
+      });
+      this.outposts.forEach(o => {
+        const ox = o.x / TS, oy = o.y / TS;
+        disc(ox, oy, 5, 'rgba(230,214,160,0.3)', null);
+        ctx.fillStyle = '#4b7a4d';
+        ctx.fillRect(Math.round(ox) - 1, Math.round(oy) - 1, 3, 2);
+        ctx.fillStyle = '#d9c78e';
+        ctx.fillRect(Math.round(ox), Math.round(oy) - 2, 1, 1);
+      });
+      this.arenas.forEach(a => {
+        const r = Math.max(4, Math.round(a.radiusPx / TS * 0.9));
+        disc(a.tx, a.ty, r, 'rgba(214,190,140,0.16)', 'rgba(70,52,43,0.62)');
+        ctx.fillStyle = a.kind === 'big' ? '#8f3d33' : '#8b6640';
+        ctx.fillRect(a.tx - 1, a.ty - 1, 2, 2);
+      });
+      const f = this.finalArena;
+      disc(f.tx, f.ty, Math.max(5, Math.round(f.radiusPx / TS * 0.9)), 'rgba(180,140,220,0.14)', 'rgba(154,112,190,0.7)');
+
+      this.mapTexture = canvas;
+      return canvas;
+    }
+
+    drawMapTexture(ctx, w, h) {
+      const tex = this.buildMapTexture();
+      ctx.save();
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(tex, 0, 0, w, h);
+      ctx.restore();
     }
 
     drawMinimap(ctx, w, h, knownZones) {

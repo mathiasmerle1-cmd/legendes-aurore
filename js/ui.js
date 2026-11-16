@@ -24,7 +24,11 @@
     selectedQuestId: null,
     shopVendorId: null,
     shopMessage: '',
-    forgeMessage: ''
+    forgeMessage: '',
+    mapPois: [],
+    mapHover: null,
+    mapClock: 0,
+    mapFogCache: null
   };
 
   const iconCache = new Map();
@@ -231,7 +235,7 @@
           <button class="pixel-btn ghost" id="btn-help">COMMANDES</button>
         </div>
         <div class="save-summary" id="save-summary"></div>
-        <div class="title-note">v1.1 · quêtes, journal et marchands</div>
+        <div class="title-note">v1.3 · brume, repères et lumière des terres</div>
       </div>
       <div class="title-badge">Cliquez pour activer le son</div>
     `;
@@ -1098,34 +1102,146 @@
   /* ============================================================
      Carte
      ============================================================ */
+  UI.mapQuestInfo = function () {
+    if (!window.Quests || !this.game || !this.game.player) return null;
+    const pack = window.Quests.tracked();
+    if (!pack) return null;
+    const game = this.game;
+    const player = game.player;
+
+    // Une quête prête se rend à son donneur, pas à sa cible d'origine.
+    const idx = Math.max(0, pack.objectives.indexOf(pack.objective));
+    const raw = pack.q.objectives[idx] || pack.q.objectives[0] || {};
+    let x = null, y = null, where = '', sub = '';
+    const setZone = (zoneId) => {
+      const z = D.ZONE_BY_ID[zoneId] || D.ZONES[0];
+      x = z.anchor.x * D.TILE + 8;
+      y = z.anchor.y * D.TILE + 16;
+      where = z.short;
+      sub = z.name;
+    };
+    const setNpc = (id) => {
+      const npc = game.world.npcs.find(n => n.id === id);
+      if (npc) {
+        x = npc.x; y = npc.y; where = npc.name; sub = npc.hint || 'Village d’Aurore';
+      } else {
+        const def = D.NPCS.find(n => n.id === id);
+        if (def) {
+          x = def.x * D.TILE + 8;
+          y = def.y * D.TILE + 16;
+          where = def.name;
+          sub = def.hint || 'Village d’Aurore';
+        }
+      }
+    };
+    const setArena = (bossId) => {
+      const a = bossId === 'nyx'
+        ? game.world.finalArena
+        : (game.world.arenas.find(v => v.bossId === bossId && !v.defeated) || game.world.arenas.find(v => v.bossId === bossId));
+      if (a) {
+        x = a.x; y = a.y;
+        where = a.kind === 'final' ? 'Ruines de l’Aube' : a.name;
+        sub = a.kind === 'final' ? 'Monolithe de Nyx' : (a.kind === 'big' ? 'Arène d’un Gardien' : 'Arène ancienne');
+      }
+    };
+
+    const ready = pack.status === 'ready' || pack.objectives.every(o => o.done);
+    if (ready || ['material', 'upgrade', 'talk'].includes(pack.objective.type)) {
+      const giverId = pack.q.giver === 'bran' || pack.objective.type === 'upgrade' ? 'bran' : pack.q.giver;
+      setNpc(giverId);
+      if (ready) { sub = 'Remettre la quête'; }
+    } else if (pack.objective.type === 'boss') {
+      setArena(raw.target);
+    } else if (pack.objective.type === 'kill' || pack.objective.type === 'elite' || pack.objective.type === 'zone') {
+      setZone(raw.zone || pack.q.zone);
+      // Objectif de zone : pas de point précis, la carte montre la terre à parcourir.
+      x = null; y = null;
+      sub = 'Terres à parcourir';
+    } else if (pack.objective.type === 'chest') {
+      const chests = game.world.chests.filter(c => !c.opened);
+      let best = null, bd = Infinity;
+      chests.forEach(c => {
+        const d = U.dist2(player.x, player.y, c.x, c.y);
+        if (d < bd) { bd = d; best = c; }
+      });
+      if (best) { x = best.x; y = best.y; where = 'Coffre d’avant-poste'; sub = 'Ouvrir les caches d’Aurore'; }
+    } else if (pack.objective.type === 'outpost') {
+      const outs = game.world.outposts.filter(o => !game.isDiscovered('outpost', o.id));
+      let best = null, bd = Infinity;
+      outs.forEach(o => {
+        const d = U.dist2(player.x, player.y, o.x, o.y);
+        if (d < bd) { bd = d; best = o; }
+      });
+      if (best) { x = best.x; y = best.y; where = best.name; sub = 'Avant-poste à découvrir'; }
+    } else if (pack.objective.type === 'shrine') {
+      let best = null, bd = Infinity;
+      game.world.shrines.forEach(s => {
+        const d = U.dist2(player.x, player.y, s.x, s.y);
+        if (d < bd) { bd = d; best = s; }
+      });
+      if (best) { x = best.x; y = best.y; where = best.name; sub = 'Sanctuaire'; }
+    } else {
+      setZone(pack.q.zone);
+    }
+    if (x == null || y == null) return { pack, obj: pack.objective, x: null, y: null, where: '', sub, dist: null };
+    const dist = Math.round(U.dist(player.x, player.y, x, y) / D.TILE);
+    return { pack, obj: pack.objective, x, y, where, sub, dist };
+  };
+
   UI.buildMap = function (s) {
     const prog = bossProgress(this.game);
     const ex = this.game.getExploration ? this.game.getExploration() : {
       pct: 0, found: 0, total: 44, outposts: 0, outpostsTotal: 12,
-      shrines: 0, shrinesTotal: 7, arenas: 0, arenasTotal: 18
+      shrines: 0, shrinesTotal: 7, arenas: 0, arenasTotal: 18, terrainPct: 0
     };
     const disc = this.game.discovery || { zones: {}, pois: {} };
+    const quest = this.mapQuestInfo();
+    const terrainPct = ex.terrainPct || 0;
     s.innerHTML = `
       <div class="modal-dim"></div>
       <div class="panel map-panel">
-        <div class="panel-head">
+        <div class="panel-head map-head">
           <div>
             <div class="eyebrow">CARTOGRAPHIE</div>
             <h2>LES SIX TERRES D'AURORE</h2>
           </div>
-          <div class="head-right"><span class="map-pct">${ex.pct}% EXPLORÉ</span><button class="close-btn" id="map-close">✕</button></div>
+          <div class="head-right"><span class="map-pct">${terrainPct}% DU MONDE</span><button class="close-btn" id="map-close">✕</button></div>
         </div>
         <div class="map-body">
-          <canvas id="map-canvas" width="432" height="280"></canvas>
+          <div class="map-wrap" id="map-wrap">
+            <canvas id="map-canvas" width="256" height="256" aria-label="Carte des six terres"></canvas>
+            <div class="map-tooltip" id="map-tooltip"></div>
+          </div>
           <div class="map-side">
-            <div class="map-progress">
-              <div class="big-count">${prog.bigDone}<span>/6</span></div>
-              <div class="big-label">GARDIENS VAINCUS</div>
+            <div class="map-stats">
+              <div class="map-progress">
+                <div class="big-count">${prog.bigDone}<span>/6</span></div>
+                <div class="big-label">GARDIENS<br>VAINCUS</div>
+              </div>
+              <div class="map-explore">
+                <div class="explore-top"><span>LIEUX DÉCOUVERTS</span><b>${ex.pct}%</b></div>
+                <div class="explore-bar"><i style="width:${ex.pct}%"></i></div>
+                <div class="explore-detail"><span>Avant-postes ${ex.outposts}/${ex.outpostsTotal}</span><span>Sanctuaires ${ex.shrines}/${ex.shrinesTotal}</span></div>
+                <div class="explore-top terrain"><span>TERRAIN EXPLORÉ</span><b>${terrainPct}%</b></div>
+                <div class="explore-bar thin"><i style="width:${terrainPct}%"></i></div>
+              </div>
             </div>
-            <div class="map-explore">
-              <div class="explore-top"><span>EXPLORATION</span><b>${ex.pct}%</b></div>
-              <div class="explore-bar"><i style="width:${ex.pct}%"></i></div>
-              <div class="explore-detail"><span>Avant-postes ${ex.outposts}/${ex.outpostsTotal}</span><span>Sanctuaires ${ex.shrines}/${ex.shrinesTotal}</span></div>
+            ${quest ? `
+            <div class="map-quest">
+              <div class="map-quest-kicker">QUÊTE SUIVIE</div>
+              <b>${quest.pack.q.title}</b>
+              <span>${quest.obj.label}</span>
+              <em>${quest.where ? quest.where : 'Aurore'}${quest.dist != null ? ' · ≈ ' + quest.dist + ' tuiles' : ''}</em>
+            </div>` : `
+            <div class="map-quest empty">
+              <div class="map-quest-kicker">QUÊTE SUIVIE</div>
+              <span>Aucune quête en cours. Parlez aux habitants pour en découvrir.</span>
+            </div>`}
+            <div class="map-zones">
+              ${D.ZONES.map(z => {
+                const known = !!(disc.zones && disc.zones[z.id]);
+                return `<span class="${known ? '' : 'unknown'}" style="border-color:${known ? z.color + '66' : '#3a3344'}"><i style="background:${known ? z.color : '#4a4353'}"></i>${known ? z.short : '???'}</span>`;
+              }).join('')}
             </div>
             <div class="map-legend">
               <div><i class="dot player"></i>Vous</div>
@@ -1135,21 +1251,201 @@
               <div><i class="dot big"></i>Gardien</div>
               <div><i class="dot done"></i>Vaincu</div>
               <div><i class="dot final"></i>Monolithe</div>
+              <div><i class="dot quest"></i>Quête</div>
+              <div><i class="dot waypoint"></i>Repère</div>
             </div>
-            <div class="map-zones">
-              ${D.ZONES.map(z => {
-                const known = !!(disc.zones && disc.zones[z.id]);
-                return `<span class="${known ? '' : 'unknown'}" style="border-color:${known ? z.color + '66' : '#3a3344'}"><i style="background:${known ? z.color : '#4a4353'}"></i>${known ? z.short : '???'}</span>`;
-              }).join('')}
-            </div>
-            <div class="map-tip">Approchez-vous des avant-postes, sanctuaires et arènes pour les révéler. Les terres inconnues restent dans l'ombre.</div>
+            <div class="map-tip">Survolez un lieu pour l’identifier. Clic : poser un repère · clic droit : l’effacer.</div>
           </div>
         </div>
-        <div class="panel-foot"><span class="hint">M pour fermer · 480 × 480 tuiles · 4× la carte d'origine</span><span class="hint">${prog.done}/18 boss · ${ex.found}/${ex.total} lieux</span></div>
+        <div class="panel-foot"><span class="hint">M pour fermer · clic : repère · clic droit : effacer</span><span class="hint">${prog.done}/18 boss · ${ex.found}/${ex.total} lieux</span></div>
       </div>
     `;
     s.querySelector('#map-close').addEventListener('click', () => this.close());
+    const wrap = s.querySelector('#map-wrap');
+    const canvas = s.querySelector('#map-canvas');
+    const tooltip = s.querySelector('#map-tooltip');
+    const hideTip = () => {
+      tooltip.classList.remove('visible');
+      if (this.mapHover) { this.mapHover = null; this.drawMap(s); }
+    };
+    canvas.addEventListener('mousemove', (ev) => {
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const mx = (ev.clientX - rect.left) * (canvas.width / rect.width);
+      const my = (ev.clientY - rect.top) * (canvas.height / rect.height);
+      let best = null, bd = 10 * 10;
+      for (const p of this.mapPois) {
+        const d = U.dist2(mx, my, p.x, p.y);
+        if (d <= bd) { bd = d; best = p; }
+      }
+      if (!best) {
+        tooltip.classList.remove('visible');
+        if (this.mapHover) { this.mapHover = null; this.drawMap(s); }
+        return;
+      }
+      if (this.mapHover !== best.key) {
+        this.mapHover = best.key;
+        this.drawMap(s);
+      }
+      tooltip.innerHTML = `<b>${best.title}</b><small>${best.sub}</small>`;
+      tooltip.classList.add('visible');
+      const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+      const left = U.clamp(best.x + 10, 4, canvas.width - tw - 4);
+      const top = U.clamp(best.y - th - 8, 4, canvas.height - th - 4);
+      tooltip.style.left = Math.round(left) + 'px';
+      tooltip.style.top = Math.round(top) + 'px';
+    });
+    canvas.addEventListener('mouseleave', hideTip);
+    const game = this.game;
+    const worldPx = D.WORLD_SIZE * D.TILE;
+    const onClick = (ev) => {
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const mx = (ev.clientX - rect.left) * (canvas.width / rect.width);
+      const my = (ev.clientY - rect.top) * (canvas.height / rect.height);
+      const scale = canvas.width / worldPx;
+      const wp = game.waypoint;
+      if (wp) {
+        const dx = wp.x * scale - mx, dy = wp.y * scale - my;
+        if (dx * dx + dy * dy <= 81) {
+          game.waypoint = null;
+          game.saveSoon();
+          window.AudioSys.sfx('click');
+          game.toast('REPÈRE EFFACÉ', '#8fd8f0');
+          this.drawMap(s);
+          return;
+        }
+      }
+      const wx = U.clamp(mx / scale, 0, worldPx - 1);
+      const wy = U.clamp(my / scale, 0, worldPx - 1);
+      game.waypoint = { x: wx, y: wy };
+      game.saveSoon();
+      window.AudioSys.sfx('click');
+      const p = game.player;
+      const dist = p ? Math.round(U.dist(p.x, p.y, wx, wy) / D.TILE) : null;
+      let known = true;
+      if (game.explored && game.explored.length) {
+        const cw = Math.round(Math.sqrt(game.explored.length));
+        const cx = Math.floor(wx / worldPx * cw);
+        const cy = Math.floor(wy / worldPx * cw);
+        known = !!game.explored[U.clamp(cy, 0, cw - 1) * cw + U.clamp(cx, 0, cw - 1)];
+      }
+      game.toast((known ? 'REPÈRE POSÉ' : 'REPÈRE EN TERRE INCONNUE') + (dist != null ? ' · ' + dist + ' TUILES' : ''), '#8fd8f0');
+      this.drawMap(s);
+    };
+    canvas.addEventListener('click', onClick);
+    canvas.addEventListener('contextmenu', (ev) => {
+      ev.preventDefault();
+      if (!game.waypoint) return;
+      game.waypoint = null;
+      game.saveSoon();
+      window.AudioSys.sfx('click');
+      game.toast('REPÈRE EFFACÉ', '#8fd8f0');
+      this.drawMap(s);
+    });
+    this.mapHover = null;
+    this.mapClock = 0;
     this.drawMap(s);
+  };
+
+  /* Brouillard de guerre texturé : parchemin sombre, hachures d'encre,
+     grain de papier et bords fondus comme des nappes de brume. */
+  UI.buildMapFog = function (game, w, h) {
+    const cache = this.mapFogCache;
+    if (cache && cache.ref === game.explored && cache.version === (game.exploredVersion || 0) &&
+        cache.w === w && cache.h === h) return cache.canvas;
+    const cw = Math.round(Math.sqrt(game.explored.length));
+    const canvas = Art.cvs(w, h);
+    const ctx = canvas.getContext('2d');
+
+    const base = ctx.createLinearGradient(0, 0, w * 0.35, h);
+    base.addColorStop(0, '#2c2539');
+    base.addColorStop(0.55, '#211b2e');
+    base.addColorStop(1, '#161120');
+    ctx.fillStyle = base;
+    ctx.fillRect(0, 0, w, h);
+
+    // Grain de papier : une texture à peine visible qui casse le plat.
+    const img = ctx.getImageData(0, 0, w, h);
+    const px = img.data;
+    const seed = (game.world && game.world.seed ? game.world.seed : 1) + 77;
+    for (let i = 0; i < w * h; i++) {
+      const n = U.hash2(i % w, (i / w) | 0, seed) - 0.5;
+      const o = i * 4;
+      px[o] = U.clamp(px[o] + n * 11, 0, 255);
+      px[o + 1] = U.clamp(px[o + 1] + n * 9, 0, 255);
+      px[o + 2] = U.clamp(px[o + 2] + n * 13, 0, 255);
+    }
+    ctx.putImageData(img, 0, 0);
+
+    // Hachures diagonales des terres inconnues, comme sur les cartes anciennes.
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(232, 214, 170, 0.032)';
+    for (let x = -h; x < w; x += 7) {
+      ctx.beginPath();
+      ctx.moveTo(x + 0.5, 0);
+      ctx.lineTo(x + h + 0.5, h);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(232, 214, 170, 0.05)';
+    for (let x = -h; x < w; x += 29) {
+      ctx.beginPath();
+      ctx.moveTo(x + 0.5, 0);
+      ctx.lineTo(x + h + 0.5, h);
+      ctx.stroke();
+    }
+
+    // Volutes de brume : lueurs chaudes et creux violacés.
+    for (let i = 0; i < 14; i++) {
+      const bx = U.hash2(i, 3, seed + 11) * w;
+      const by = U.hash2(i, 9, seed + 29) * h;
+      const r = 18 + U.hash2(i, 5, seed + 47) * 42;
+      const g = ctx.createRadialGradient(bx, by, 1, bx, by, r);
+      const warm = i % 3 === 0;
+      g.addColorStop(0, warm ? 'rgba(226, 202, 158, 0.055)' : 'rgba(96, 82, 132, 0.07)');
+      g.addColorStop(0.55, warm ? 'rgba(226, 202, 158, 0.02)' : 'rgba(72, 60, 104, 0.03)');
+      g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(bx - r, by - r, r * 2, r * 2);
+    }
+
+    // Semis d'étoiles de mer / poussières dorées.
+    for (let i = 0; i < 260; i++) {
+      const sx = Math.floor(U.hash2(i, 13, seed + 61) * w);
+      const sy = Math.floor(U.hash2(i, 17, seed + 83) * h);
+      ctx.fillStyle = i % 5 === 0 ? 'rgba(255, 238, 194, 0.11)' : 'rgba(206, 190, 160, 0.05)';
+      ctx.fillRect(sx, sy, 1, 1);
+    }
+
+    // Découpe : seules les cases non explorées gardent la brume.
+    const mask = Art.cvs(w, h);
+    const mctx = mask.getContext('2d');
+    const cell = w / cw;
+    mctx.fillStyle = '#fff';
+    for (let gy = 0; gy < cw; gy++) {
+      for (let gx = 0; gx < cw; gx++) {
+        if (game.explored[gy * cw + gx]) continue;
+        mctx.fillRect(Math.floor(gx * cell), Math.floor(gy * cell), Math.ceil(cell) + 1, Math.ceil(cell) + 1);
+      }
+    }
+    const soft = Art.cvs(w, h);
+    const sctx = soft.getContext('2d');
+    if ('filter' in sctx) {
+      sctx.filter = 'blur(3px)';
+      sctx.drawImage(mask, 0, 0);
+      sctx.filter = 'none';
+    } else {
+      sctx.imageSmoothingEnabled = true;
+      sctx.drawImage(mask, 0, 0, w, h);
+    }
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.drawImage(soft, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+
+    this.mapFogCache = {
+      ref: game.explored, version: game.exploredVersion || 0, w, h, canvas
+    };
+    return canvas;
   };
 
   UI.drawMap = function (s) {
@@ -1160,108 +1456,332 @@
     const ctx = canvas.getContext('2d');
     const w = canvas.width, h = canvas.height;
     const game = this.game;
+    if (!game || !game.world) return;
     const disc = game.discovery || { zones: {}, pois: {} };
     const known = (kind, id) => game.isDiscovered ? game.isDiscovered(kind, id) : false;
+    const scale = w / (D.WORLD_SIZE * D.TILE);
+    const px = (x) => x * scale;
+    const py = (y) => y * scale;
+
+    ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = '#0d1018';
     ctx.fillRect(0, 0, w, h);
-    game.world.drawMinimap(ctx, w, h, disc.zones || {});
-    // voile
-    ctx.fillStyle = 'rgba(12,10,18,0.1)';
-    ctx.fillRect(0, 0, w, h);
-    // grille de carte
-    ctx.strokeStyle = 'rgba(255,236,190,0.045)';
+
+    // Terrain détaillé, généré une seule fois puis conservé.
+    game.world.drawMapTexture(ctx, w, h);
+
+    // Brouillard de guerre persistant, texturé et aux bords fondus.
+    if (game.explored && game.explored.length) {
+      ctx.drawImage(this.buildMapFog(game, w, h), 0, 0);
+    }
+
+    // Quadrillage discret.
+    ctx.strokeStyle = 'rgba(255,236,190,0.055)';
     ctx.lineWidth = 1;
     for (let i = 1; i < 8; i++) {
-      const gx = Math.round(w * i / 8) + 0.5, gy = Math.round(h * i / 8) + 0.5;
+      const gx = Math.round(w * i / 8) + 0.5;
       ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, h); ctx.stroke();
+    }
+    for (let i = 1; i < 8; i++) {
+      const gy = Math.round(h * i / 8) + 0.5;
       ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke();
     }
-    const sx = w / D.WORLD_SIZE, sy = h / D.WORLD_SIZE;
-    const tx = D.TILE;
-    const px = (x) => (x / tx) * sx;
-    const py = (y) => (y / tx) * sy;
 
-    // zones connues
+    // Noms des terres connues, sur un cartouche sombre.
     D.ZONES.forEach(z => {
-      const x = px(z.anchor.x * tx + 8), y = py(z.anchor.y * tx + 8);
-      if (disc.zones && disc.zones[z.id]) {
-        Art.drawText(ctx, z.short, x, y, z.color, 1, true, 'center');
-        Art.drawText(ctx, 'Nv ' + z.levelMin + '-' + z.levelMax, x, y + 9, '#e8dfc8', 1, true, 'center');
-      } else {
-        Art.drawText(ctx, '?', x, y, '#6a6276', 2, true, 'center');
-      }
+      if (!(disc.zones && disc.zones[z.id])) return;
+      const x = px(z.anchor.x * D.TILE + 8), y0 = py(z.anchor.y * D.TILE + 8);
+      // Le village occupe le centre des Plaines : on remonte le cartouche.
+      const y = z.id === 'plains' ? y0 - 17 : y0;
+      const label = z.short;
+      const tw = Art.textWidth(label, 1);
+      ctx.fillStyle = 'rgba(10,8,16,0.6)';
+      ctx.fillRect(Math.round(x - tw / 2 - 4), Math.round(y - 4), tw + 8, 17);
+      ctx.strokeStyle = U.rgba(z.color, 0.45);
+      ctx.strokeRect(Math.round(x - tw / 2 - 3.5) + 0.5, Math.round(y - 3.5) + 0.5, tw + 7, 16);
+      Art.drawText(ctx, label, x, y, z.color, 1, true, 'center');
+      Art.drawText(ctx, 'NV ' + z.levelMin + '-' + z.levelMax, x, y + 8, '#ece2ca', 1, true, 'center');
     });
 
-    // avant-postes découverts
+    // Lieux découverts.
+    const pois = [];
     game.world.outposts.forEach(o => {
       if (!known('outpost', o.id)) return;
-      const x = Math.round(px(o.x)), y = Math.round(py(o.y));
-      ctx.fillStyle = '#8ef0a8';
-      ctx.fillRect(x - 2, y, 4, 2);
-      ctx.fillRect(x - 1, y - 2, 2, 3);
-      ctx.fillStyle = '#ffd76a';
-      ctx.fillRect(x + 2, y + 1, 1, 1);
+      const z = D.ZONE_BY_ID[o.biome];
+      pois.push({
+        key: 'outpost:' + o.id, kind: 'outpost', x: px(o.x), y: py(o.y), r: 6,
+        title: o.name, sub: 'Avant-poste sûr · ' + (z ? z.short : 'Aurore') + ' · coffre',
+        color: '#8ef0a8'
+      });
     });
-
-    // sanctuaires découverts
     game.world.shrines.forEach(sh => {
       if (!known('shrine', sh.id)) return;
-      ctx.fillStyle = '#8fe6e0';
-      ctx.fillRect(px(sh.x) - 1, py(sh.y) - 3, 3, 7);
-      ctx.fillRect(px(sh.x) - 3, py(sh.y) - 1, 7, 3);
+      pois.push({
+        key: 'shrine:' + sh.id, kind: 'shrine', x: px(sh.x), y: py(sh.y), r: 6,
+        title: sh.name, sub: 'Sanctuaire · repos et sauvegarde', color: '#8fe6e0'
+      });
     });
-
-    // arènes découvertes
     game.world.arenas.forEach(a => {
       if (!known('arena', a.id)) return;
-      const x = px(a.x), y = py(a.y);
-      const isBig = a.kind === 'big';
-      const r = isBig ? 5 : 3;
-      if (a.defeated) {
-        ctx.strokeStyle = '#7fe0a2'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(x - 3, y - 3); ctx.lineTo(x + 3, y + 3); ctx.moveTo(x + 3, y - 3); ctx.lineTo(x - 3, y + 3); ctx.stroke();
-      } else {
-        ctx.fillStyle = isBig ? '#ff7a5e' : '#ffbe5c';
-        ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI / 4);
-        ctx.fillRect(-r / 2, -r / 2, r, r);
+      const def = D.BOSSES[a.bossId];
+      pois.push({
+        key: 'arena:' + a.id, kind: 'arena', big: a.kind === 'big', defeated: !!a.defeated,
+        x: px(a.x), y: py(a.y), r: a.kind === 'big' ? 7 : 6,
+        title: a.name,
+        sub: (a.kind === 'big' ? 'Gardien' : 'Mini-boss') + ' · Nv ' + (def ? def.level : '?') + (a.defeated ? ' · vaincu' : ''),
+        color: a.kind === 'big' ? '#ff7a5e' : '#ffbe5c'
+      });
+    });
+    if (known('final', 'final')) {
+      const f = game.world.finalArena;
+      pois.push({
+        key: 'final', kind: 'final', x: px(f.x), y: py(f.y), r: 8,
+        title: 'Ruines de l’Aube', sub: 'Monolithe de Nyx · Gardien final', color: '#c08aff'
+      });
+    }
+    const vx = px(game.world.village.x), vy = py(game.world.village.y);
+    pois.push({
+      key: 'village', kind: 'village', x: vx, y: vy, r: 8,
+      title: game.world.village.name, sub: 'Refuge · forge, boutiques et auberge', color: '#ffd76a'
+    });
+
+    // Repère personnel posé d'un clic sur la carte.
+    if (game.waypoint) {
+      const wx = px(game.waypoint.x), wy = py(game.waypoint.y);
+      const mapPos = game.interior && game.interiorReturn ? game.interiorReturn : game.player;
+      const dist = mapPos ? Math.round(U.dist(mapPos.x, mapPos.y, game.waypoint.x, game.waypoint.y) / D.TILE) : null;
+      pois.push({
+        key: 'waypoint', kind: 'waypoint', x: wx, y: wy, r: 7,
+        title: 'Repère personnel',
+        sub: 'Clic pour retirer' + (dist != null ? ' · ' + dist + ' tuiles' : ''),
+        color: '#8fd8f0'
+      });
+      if (mapPos) {
+        const plx = px(mapPos.x), ply = py(mapPos.y);
+        ctx.save();
+        ctx.setLineDash([2, 5]);
+        ctx.lineDashOffset = -this.editorTime * 14;
+        ctx.strokeStyle = 'rgba(143,216,240,0.38)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(plx, ply);
+        ctx.lineTo(wx, wy);
+        ctx.stroke();
         ctx.restore();
-        ctx.strokeStyle = 'rgba(255,220,150,0.5)'; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.arc(x, y, r + 3, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+
+    const quest = this.mapQuestInfo();
+    if (quest && quest.x != null) {
+      const qx = px(quest.x), qy = py(quest.y);
+      pois.push({
+        key: 'quest', kind: 'quest', x: qx, y: qy, r: 7,
+        title: 'Quête · ' + quest.pack.q.title,
+        sub: quest.obj.label + (quest.where ? ' · ' + quest.where : ''),
+        color: '#ffd76a'
+      });
+      // Fil d'Ariane discret vers l'objectif.
+      const playerPos = game.interior && game.interiorReturn ? game.interiorReturn : game.player;
+      if (playerPos) {
+        const plx = px(playerPos.x), ply = py(playerPos.y);
+        ctx.save();
+        ctx.setLineDash([3, 4]);
+        ctx.strokeStyle = 'rgba(255,215,106,0.42)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(plx, ply);
+        ctx.lineTo(qx, qy);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    const shadow = (x, y, r) => {
+      ctx.fillStyle = 'rgba(9,7,13,0.72)';
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    };
+    const hoverRing = (p) => {
+      if (this.mapHover !== p.key) return;
+      ctx.strokeStyle = U.rgba(p.color, 0.95);
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 3, 0, Math.PI * 2); ctx.stroke();
+    };
+    pois.forEach(p => {
+      const x = Math.round(p.x), y = Math.round(p.y);
+      hoverRing(p);
+      if (p.kind === 'outpost') {
+        shadow(x, y, 5);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(x - 3, y, 6, 2);
+        ctx.fillRect(x - 2, y - 2, 4, 2);
+        ctx.fillRect(x - 1, y - 4, 2, 2);
+        ctx.fillStyle = '#ffd76a';
+        ctx.fillRect(x + 3, y - 4, 1, 4);
+      } else if (p.kind === 'shrine') {
+        shadow(x, y, 5);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(x - 1, y - 4, 3, 9);
+        ctx.fillRect(x - 4, y - 1, 9, 3);
+        ctx.fillStyle = '#eaffff';
+        ctx.fillRect(x, y - 2, 1, 4);
+      } else if (p.kind === 'arena') {
+        shadow(x, y, p.big ? 7 : 6);
+        if (p.defeated) {
+          ctx.strokeStyle = '#7fe0a2';
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(x - 3, y - 3); ctx.lineTo(x + 3, y + 3); ctx.moveTo(x + 3, y - 3); ctx.lineTo(x - 3, y + 3); ctx.stroke();
+        } else {
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(Math.PI / 4);
+          ctx.fillStyle = '#1a1119';
+          ctx.fillRect(-4, -4, 8, 8);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-3, -3, 6, 6);
+          ctx.fillStyle = '#ffe2a0';
+          ctx.fillRect(-1, -1, 2, 2);
+          ctx.restore();
+          if (p.big) {
+            ctx.strokeStyle = 'rgba(255,220,150,0.5)';
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2); ctx.stroke();
+          }
+        }
+      } else if (p.kind === 'village') {
+        shadow(x, y, 8);
+        ctx.fillStyle = '#f0d89b'; ctx.fillRect(x - 5, y - 5, 10, 10);
+        ctx.fillStyle = '#a8794b'; ctx.fillRect(x - 4, y - 1, 8, 5);
+        ctx.fillStyle = '#7c4f2e'; ctx.fillRect(x - 5, y - 4, 10, 3);
+        ctx.fillStyle = '#79c8d6'; ctx.fillRect(x - 1, y + 1, 3, 3);
+        ctx.fillStyle = '#ffe9b0'; ctx.fillRect(x - 3, y - 3, 2, 1);
+      } else if (p.kind === 'final') {
+        shadow(x, y, 8);
+        const pulse = 7 + Math.sin(this.editorTime * 3) * 2;
+        ctx.strokeStyle = 'rgba(200,145,255,' + (0.5 + Math.sin(this.editorTime * 3) * 0.2) + ')';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(x, y, pulse, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = '#1a1122';
+        ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI / 4); ctx.fillRect(-5, -5, 10, 10); ctx.restore();
+        ctx.fillStyle = '#c08aff';
+        ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI / 4); ctx.fillRect(-3, -3, 6, 6); ctx.restore();
+        ctx.fillStyle = '#f3e6ff'; ctx.fillRect(x - 1, y - 1, 2, 2);
+      } else if (p.kind === 'quest') {
+        const pulse = 6 + Math.sin(this.editorTime * 5) * 1.5;
+        ctx.strokeStyle = 'rgba(255,215,106,0.8)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(x, y, pulse, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = 'rgba(20,15,24,0.85)';
+        ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
+        Art.drawText(ctx, '!', x, y - 3, '#ffd76a', 1, false, 'center');
+      } else if (p.kind === 'waypoint') {
+        const pulse = 8 + Math.sin(this.editorTime * 4) * 1.6;
+        ctx.strokeStyle = 'rgba(143,216,240,' + (0.55 + Math.sin(this.editorTime * 4) * 0.18) + ')';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(x, y, pulse, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = 'rgba(14,20,26,0.8)';
+        ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill();
+        // Petit drapeau cyan : le mât descend jusqu'au sol.
+        ctx.fillStyle = '#8fd8f0';
+        ctx.fillRect(x - 2, y - 9, 1, 10);
+        ctx.beginPath();
+        ctx.moveTo(x - 1, y - 9);
+        ctx.lineTo(x + 4, y - 7);
+        ctx.lineTo(x - 1, y - 5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#eaffff';
+        ctx.fillRect(x - 2, y - 9, 1, 1);
       }
     });
 
-    // monolithe, seulement s'il a été découvert
-    if (known('final', 'final')) {
-      const f = game.world.finalArena;
-      const fx = px(f.x), fy = py(f.y);
-      ctx.fillStyle = '#c08aff';
-      ctx.save(); ctx.translate(fx, fy); ctx.rotate(Math.PI / 4); ctx.fillRect(-4, -4, 8, 8); ctx.restore();
-      ctx.strokeStyle = 'rgba(200,145,255,0.65)'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(fx, fy, 8 + Math.sin(this.editorTime * 3) * 2, 0, Math.PI * 2); ctx.stroke();
+    // Joueur : anneau pulsant, position mémorisée devant la porte en intérieur.
+    const mapPos = game.interior && game.interiorReturn ? game.interiorReturn : game.player;
+    if (mapPos) {
+      const plx = px(mapPos.x), ply = py(mapPos.y);
+      const pulse = 4 + Math.sin(this.editorTime * 5) * 1.6;
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(plx, ply, pulse + 3, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#16121d';
+      ctx.beginPath(); ctx.arc(plx, ply, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fffdf2';
+      ctx.beginPath(); ctx.arc(plx, ply, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e3b950';
+      ctx.fillRect(Math.round(plx) - 1, Math.round(ply) - 1, 2, 2);
+      if (game.player && !game.interior) {
+        const dirs = [[0, 1], [-1, 0], [1, 0], [0, -1]];
+        const fd = dirs[game.player.facing || 0] || dirs[0];
+        ctx.fillStyle = '#ffd76a';
+        ctx.fillRect(Math.round(plx + fd[0] * 4) - 1, Math.round(ply + fd[1] * 4) - 1, 2, 2);
+      }
     }
 
-    // village
-    const vx = px(game.world.village.x), vy = px(game.world.village.y);
-    ctx.fillStyle = '#f0d89b'; ctx.fillRect(vx - 5, vy - 5, 10, 10);
-    ctx.fillStyle = '#a8794b'; ctx.fillRect(vx - 3, vy - 3, 6, 6);
-    ctx.fillStyle = '#79c8d6'; ctx.fillRect(vx - 1, vy - 1, 3, 3);
+    // Rose des vents.
+    const cx = w - 24, cy = 25;
+    ctx.fillStyle = 'rgba(12,10,18,0.72)';
+    ctx.beginPath(); ctx.arc(cx, cy, 17, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,215,106,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, 17, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#ffd76a';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 12); ctx.lineTo(cx + 4, cy + 1); ctx.lineTo(cx, cy - 3); ctx.lineTo(cx - 4, cy + 1);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#8b7c9a';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + 12); ctx.lineTo(cx + 3, cy + 1); ctx.lineTo(cx, cy + 4); ctx.lineTo(cx - 3, cy + 1);
+    ctx.closePath(); ctx.fill();
+    Art.drawText(ctx, 'N', cx, cy - 25, '#ffd76a', 1, true, 'center');
+    Art.drawText(ctx, 'E', cx + 21, cy - 3, '#b8a9c4', 1, true, 'center');
+    Art.drawText(ctx, 'O', cx - 21, cy - 3, '#b8a9c4', 1, true, 'center');
 
-    // joueur (dans une maison : marqueur devant la porte)
-    const mapPos = game.interior && game.interiorReturn ? game.interiorReturn : game.player;
-    const plx = px(mapPos.x), ply = py(mapPos.y);
-    const pulse = 4 + Math.sin(this.editorTime * 5) * 1.6;
-    ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(plx, ply, pulse + 3, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = '#fffdf2';
-    ctx.beginPath(); ctx.arc(plx, ply, 3, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#e3b950';
-    ctx.fillRect(plx - 1, ply - 1, 2, 2);
+    // Échelle.
+    const bx = 12, by = h - 15;
+    const bw = Math.max(24, Math.round(w * 60 / 480));
+    ctx.fillStyle = 'rgba(10,8,16,0.66)';
+    ctx.fillRect(bx - 5, by - 7, bw + 52, 20);
+    ctx.strokeStyle = 'rgba(255,236,190,0.35)';
+    ctx.strokeRect(bx - 5.5 + 0.5, by - 6.5 + 0.5, bw + 51, 19);
+    ctx.fillStyle = '#e8dcc0';
+    ctx.fillRect(bx, by, bw, 1);
+    ctx.fillRect(bx, by - 3, 1, 4);
+    ctx.fillRect(bx + bw, by - 3, 1, 4);
+    ctx.fillRect(bx + Math.round(bw / 2), by - 2, 1, 3);
+    Art.drawText(ctx, '60 TUILES', bx + bw + 5, by - 3, '#d9cdb2', 1, true);
 
-    // boussole
-    ctx.fillStyle = 'rgba(16,13,22,0.75)';
-    ctx.fillRect(w - 30, 8, 22, 22);
-    Art.drawText(ctx, 'N', w - 19, 12, '#ffd76a', 1, true, 'center');
-    ctx.strokeStyle = '#cbbf9e'; ctx.beginPath(); ctx.moveTo(w - 19, 27); ctx.lineTo(w - 19, 19); ctx.stroke();
+    // Cadre de la carte.
+    ctx.strokeStyle = 'rgba(255,215,106,0.24)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(3.5, 3.5, w - 7, h - 7);
+    ctx.strokeStyle = 'rgba(9,7,13,0.9)';
+    ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
+
+    // Graduations fines, comme sur un relevé de cartographe.
+    ctx.strokeStyle = 'rgba(255,236,190,0.22)';
+    for (let i = 8; i < w - 6; i += 16) {
+      const len = i % 32 === 0 ? 4 : 2;
+      ctx.beginPath(); ctx.moveTo(i + 0.5, 4); ctx.lineTo(i + 0.5, 4 + len); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(i + 0.5, h - 4); ctx.lineTo(i + 0.5, h - 4 - len); ctx.stroke();
+    }
+    for (let i = 8; i < h - 6; i += 16) {
+      const len = i % 32 === 0 ? 4 : 2;
+      ctx.beginPath(); ctx.moveTo(4, i + 0.5); ctx.lineTo(4 + len, i + 0.5); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(w - 4, i + 0.5); ctx.lineTo(w - 4 - len, i + 0.5); ctx.stroke();
+    }
+
+    // Équerres dorées aux quatre coins.
+    ctx.strokeStyle = 'rgba(255,215,106,0.46)';
+    const cl = 9;
+    [[6, 6, 1, 1], [w - 6, 6, -1, 1], [6, h - 6, 1, -1], [w - 6, h - 6, -1, -1]].forEach(([cx0, cy0, sx, sy]) => {
+      ctx.beginPath();
+      ctx.moveTo(cx0 + sx * cl, cy0 + 0.5);
+      ctx.lineTo(cx0 + 0.5, cy0 + 0.5);
+      ctx.lineTo(cx0 + 0.5, cy0 + sy * cl);
+      ctx.stroke();
+    });
+
+    this.mapPois = pois;
+    this.mapClock = 0.1;
   };
 
   /* ============================================================
@@ -1532,6 +2052,10 @@
       if (this.banner.life <= 0) this.banner = null;
     }
     if (this.modal === 'editor') this.drawEditorPreview();
+    if (this.modal === 'map') {
+      this.mapClock -= dt;
+      if (this.mapClock <= 0) this.drawMap();
+    }
     if (this.dialog) {
       const d = this.dialog;
       const line = d.lines[d.index] || '';
@@ -1558,6 +2082,36 @@
   UI.drawHUD = function (ctx, game) {
     const p = game.player;
     if (!p) return;
+
+    // Balise du repère personnel, dessinée sous les panneaux du HUD.
+    if (game.waypoint && !game.interior) {
+      const rcX = U.clamp(Math.round(game.camX + game.shakeX), 0, D.WORLD_SIZE * 16 - 640);
+      const rcY = U.clamp(Math.round(game.camY + game.shakeY), 0, D.WORLD_SIZE * 16 - 360);
+      const wx = Math.round(game.waypoint.x - rcX);
+      const wy = Math.round(game.waypoint.y - rcY);
+      if (wx > 8 && wx < 632 && wy > 16 && wy < 352) {
+        const bob = Math.sin(game.time * 3.2) * 2;
+        ctx.globalAlpha = 0.85;
+        ctx.strokeStyle = 'rgba(143,216,240,0.6)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(wx, wy, 7, 3, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(143,216,240,0.18)';
+        ctx.fillRect(wx - 1, wy - 18 + bob, 2, 16);
+        ctx.fillStyle = '#8fd8f0';
+        ctx.beginPath();
+        ctx.moveTo(wx, wy - 24 + bob);
+        ctx.lineTo(wx + 4, wy - 20 + bob);
+        ctx.lineTo(wx, wy - 16 + bob);
+        ctx.lineTo(wx - 4, wy - 20 + bob);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#eaffff';
+        ctx.fillRect(wx - 1, wy - 21 + bob, 2, 2);
+        ctx.globalAlpha = 1;
+      }
+    }
 
     // panneau gauche
     panel(ctx, 8, 8, 186, 54, 0.78);
@@ -1612,6 +2166,31 @@
       Art.drawText(ctx, truncateText(tracked.q.title, 26), 476, 69, '#f4ecd9', 1, true);
       Art.drawText(ctx, truncateText(objective, ready ? 26 : 20), 476, 79, ready ? '#bfe8c8' : '#c9bfa8', 1, true);
       if (count) Art.drawText(ctx, count, 626, 79, '#c9bfa8', 1, true, 'right');
+    }
+
+    // Repère personnel : flèche de boussole et distance.
+    if (game.waypoint) {
+      const mapPos = game.interior && game.interiorReturn ? game.interiorReturn : p;
+      if (mapPos) {
+        const dx = game.waypoint.x - mapPos.x;
+        const dy = game.waypoint.y - mapPos.y;
+        const tiles = Math.round(Math.sqrt(dx * dx + dy * dy) / 16);
+        panel(ctx, 470, 98, 162, 17, 0.72);
+        ctx.save();
+        ctx.translate(480, 106.5);
+        ctx.rotate(Math.atan2(dy, dx));
+        ctx.fillStyle = '#8fd8f0';
+        ctx.beginPath();
+        ctx.moveTo(5, 0);
+        ctx.lineTo(-3, -3.5);
+        ctx.lineTo(-1.5, 0);
+        ctx.lineTo(-3, 3.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        Art.drawText(ctx, tiles <= 2 ? 'REPÈRE ATTEINT' : 'REPÈRE · ' + tiles + ' T.', 490, 103, '#a8e2f4', 1, true);
+        Art.drawText(ctx, 'M', 626, 103, '#6f8794', 1, true, 'right');
+      }
     }
 
     // aide contrôles

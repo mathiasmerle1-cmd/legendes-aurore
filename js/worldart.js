@@ -159,28 +159,85 @@
     return Art.cached('water:' + biome + ':' + mask + ':' + frame, () => {
       const p = GROUND_PAL[biome] || GROUND_PAL.plains;
       const water = p.water;
-      const dark = U.shade(water, -28);
-      const light = U.shade(water, 38);
+      const dark = U.shade(water, -30);
+      const deeper = U.shade(water, -18);
+      const light = U.shade(water, 42);
       const c = cvs(16, 16), ctx = c.getContext('2d');
       R(ctx, 0, 0, 16, 16, water);
+      // rides lentes et reflets qui dérivent sur trois images
       for (let i = 0; i < 8; i++) {
-        R(ctx, (i * 5 + frame * 2) % 16, (i * 7 + 3) % 16, 3, 1, dark);
+        const px = (i * 5 + frame * 3) % 16;
+        const py = (i * 7 + 3 + frame) % 16;
+        R(ctx, px, py, 3, 1, dark);
+        if (i % 3 === 0) R(ctx, px + 1, py + 1, 2, 1, deeper);
       }
-      R(ctx, 2 + frame * 2, 4, 3, 1, light);
-      R(ctx, 9 - frame, 11, 4, 1, light);
-      R(ctx, 5, 8 + frame, 2, 1, light);
+      R(ctx, 2 + (frame % 3) * 3, 4, 3, 1, light);
+      R(ctx, 12 - frame * 2, 11, 3, 1, light);
+      R(ctx, (4 + frame * 3) % 13, 8, 2, 1, light);
+      R(ctx, (9 + frame * 2) % 14, 2, 1, 1, U.shade(water, 56));
       // écume sur les bords non connectés
-      const edge = U.shade(water, 52);
-      if (!maskHas(mask, 1)) { R(ctx, 0, 0, 16, 1, edge); R(ctx, 2, 1, 3, 1, edge); R(ctx, 9, 1, 2, 1, edge); }
-      if (!maskHas(mask, 2)) { R(ctx, 15, 0, 1, 16, edge); R(ctx, 14, 3, 1, 4, edge); R(ctx, 14, 11, 1, 2, edge); }
-      if (!maskHas(mask, 4)) { R(ctx, 0, 15, 16, 1, edge); R(ctx, 4, 14, 2, 1, edge); R(ctx, 12, 14, 2, 1, edge); }
-      if (!maskHas(mask, 8)) { R(ctx, 0, 0, 1, 16, edge); R(ctx, 1, 5, 1, 3, edge); R(ctx, 1, 12, 1, 2, edge); }
+      const edge = U.shade(water, 58);
+      const foam = U.shade(water, 74);
+      if (!maskHas(mask, 1)) {
+        R(ctx, 0, 0, 16, 1, edge); R(ctx, 2, 1, 3, 1, edge); R(ctx, 9, 1, 2, 1, edge);
+        R(ctx, 4 + frame, 0, 2, 1, foam);
+      }
+      if (!maskHas(mask, 2)) {
+        R(ctx, 15, 0, 1, 16, edge); R(ctx, 14, 3, 1, 4, edge); R(ctx, 14, 11, 1, 2, edge);
+        R(ctx, 15, 7 + frame, 1, 2, foam);
+      }
+      if (!maskHas(mask, 4)) {
+        R(ctx, 0, 15, 16, 1, edge); R(ctx, 4, 14, 2, 1, edge); R(ctx, 12, 14, 2, 1, edge);
+        R(ctx, 8 - frame, 15, 2, 1, foam);
+      }
+      if (!maskHas(mask, 8)) {
+        R(ctx, 0, 0, 1, 16, edge); R(ctx, 1, 5, 1, 3, edge); R(ctx, 1, 12, 1, 2, edge);
+        R(ctx, 0, 9 - frame, 1, 2, foam);
+      }
       // nénuphars / glace
       if (biome === 'swamp' && ((mask === 0 && frame === 0) || (mask === 15 && frame === 1))) {
         E(ctx, 10, 6, 3, 2, '#5e8a52'); R(ctx, 10, 6, 1, 1, '#b7d17a');
       }
       if (biome === 'tundra') {
         R(ctx, 3, 9, 6, 1, '#dff4f8'); R(ctx, 12, 3, 2, 1, '#e9fbff');
+        if (frame === 1) R(ctx, 5, 4, 4, 1, '#b9dbe6');
+      }
+      return c;
+    });
+  };
+
+  /* Lisière procédurale : quelques pixels du biome voisin s'égrènent
+     sur la tuile, ce qui efface la frontière en escalier entre les terres. */
+  Art.edgeTile = function (fromBiome, toKey, dir) {
+    return Art.cached('edge:' + fromBiome + ':' + toKey + ':' + dir, () => {
+      const from = GROUND_PAL[fromBiome] || GROUND_PAL.plains;
+      let pal;
+      if (toKey === 'water') pal = { base: from.water, alt: U.shade(from.water, 12), dark: U.shade(from.water, -22), light: U.shade(from.water, 40) };
+      else if (toKey === 'lava') pal = { base: '#b94325', alt: '#dd6230', dark: '#8c3220', light: '#ffa53e' };
+      else pal = GROUND_PAL[toKey] || GROUND_PAL.plains;
+      const rng = U.mulberry32(U.hashString('edge' + fromBiome + toKey + dir));
+      const c = cvs(16, 16), ctx = c.getContext('2d');
+      const densities = [0.94, 0.62, 0.3, 0.12];
+      for (let d = 0; d < 4; d++) {
+        for (let t = 0; t < 16; t++) {
+          if (rng() > densities[d]) continue;
+          let x, y;
+          if (dir === 0) { x = t; y = d; }
+          else if (dir === 1) { x = 15 - d; y = t; }
+          else if (dir === 2) { x = t; y = 15 - d; }
+          else { x = d; y = t; }
+          const roll = rng();
+          R(ctx, x, y, 1, 1, roll < 0.56 ? pal.base : roll < 0.8 ? pal.alt : pal.dark);
+          if (d === 0 && rng() < 0.18) R(ctx, x, y, 1, 1, pal.light);
+        }
+      }
+      // petits touffes qui débordent, pour casser la ligne droite
+      for (let i = 0; i < 3; i++) {
+        const t = 1 + Math.floor(rng() * 14);
+        if (dir === 0) R(ctx, t, 2 + Math.floor(rng() * 2), 1, 3, pal.dark);
+        else if (dir === 1) R(ctx, 12 + Math.floor(rng() * 2), t, 3, 1, pal.dark);
+        else if (dir === 2) R(ctx, t, 11 + Math.floor(rng() * 2), 1, 3, pal.dark);
+        else R(ctx, 2 + Math.floor(rng() * 2), t, 3, 1, pal.dark);
       }
       return c;
     });

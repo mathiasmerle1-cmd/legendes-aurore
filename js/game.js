@@ -8,6 +8,11 @@
 
   const VIEW_W = 640, VIEW_H = 360, TILE = 16;
   const WORLD_PX = D.WORLD_SIZE * TILE;
+  /* Exploration persistante : le terrain se révèle par blocs de 8 tuiles. */
+  const CHUNK = 8;
+  const CHUNK_W = Math.ceil(D.WORLD_SIZE / CHUNK);
+  /* Décors qui ondulent doucement au vent. */
+  const SWAY_TYPES = { tree: 1, bush: 1, reeds: 1, flower: 1, detail: 1, 'dead-tree': 1 };
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
@@ -48,6 +53,9 @@
     introShown: false,
     discovery: null,
     discoveryClock: 0,
+    explored: null,
+    exploredVersion: 0,
+    waypoint: null,
 
     // Intérieurs : pièce active, fondu au noir et position de retour.
     interior: null,
@@ -608,6 +616,87 @@
       return { zones: { plains: true }, pois: { village: true } };
     },
 
+    /* ----------------------------------------------------------
+       Terrain exploré (brouillard de guerre persistant)
+       ---------------------------------------------------------- */
+    freshExplored() {
+      return new Uint8Array(CHUNK_W * CHUNK_W);
+    },
+
+    loadExploration(data) {
+      if (!data || data.chunk !== CHUNK || data.size !== CHUNK_W || !data.bits) return null;
+      try {
+        const bin = atob(data.bits);
+        if (bin.length * 8 < CHUNK_W * CHUNK_W) return null;
+        const arr = this.freshExplored();
+        for (let i = 0; i < CHUNK_W * CHUNK_W; i++) {
+          arr[i] = (bin.charCodeAt(i >> 3) >> (i & 7)) & 1;
+        }
+        return arr;
+      } catch (e) {
+        return null;
+      }
+    },
+
+    encodeExplored() {
+      if (!this.explored) return null;
+      const total = CHUNK_W * CHUNK_W;
+      let bin = '';
+      for (let i = 0; i < total; i += 8) {
+        let b = 0;
+        for (let j = 0; j < 8 && i + j < total; j++) {
+          if (this.explored[i + j]) b |= 1 << j;
+        }
+        bin += String.fromCharCode(b);
+      }
+      try { return btoa(bin); } catch (e) { return null; }
+    },
+
+    revealTerrainAt(x, y, radiusTiles, silent) {
+      if (!this.explored) this.explored = this.freshExplored();
+      const cx = Math.floor(x / TILE / CHUNK);
+      const cy = Math.floor(y / TILE / CHUNK);
+      const cr = Math.ceil(radiusTiles / CHUNK) + 1;
+      const rr = radiusTiles * TILE;
+      const rr2 = rr * rr;
+      let added = 0;
+      for (let gy = Math.max(0, cy - cr); gy <= Math.min(CHUNK_W - 1, cy + cr); gy++) {
+        for (let gx = Math.max(0, cx - cr); gx <= Math.min(CHUNK_W - 1, cx + cr); gx++) {
+          const idx = gy * CHUNK_W + gx;
+          if (this.explored[idx]) continue;
+          const px = (gx + 0.5) * CHUNK * TILE;
+          const py = (gy + 0.5) * CHUNK * TILE;
+          if (U.dist2(px, py, x, y) > rr2) continue;
+          this.explored[idx] = 1;
+          added++;
+        }
+      }
+      if (added) this.exploredVersion = (this.exploredVersion || 0) + 1;
+      if (added && !silent) this.saveSoon();
+      return added;
+    },
+
+    seedExplorationFromDiscovery(silent) {
+      const d = this.discovery || this.freshDiscovery();
+      const reveal = (tx, ty, r) => this.revealTerrainAt(tx * TILE + 8, ty * TILE + 8, r, true);
+      D.ZONES.forEach(z => { if (d.zones[z.id]) reveal(z.anchor.x, z.anchor.y, 26); });
+      D.OUTPOSTS.forEach(o => { if (d.pois['outpost:' + o.id]) reveal(o.x, o.y, 18); });
+      D.SHRINES.forEach(s => { if (d.pois['shrine:' + s.id]) reveal(s.x, s.y, 16); });
+      D.ZONES.forEach(z => z.arenas.forEach(a => {
+        if (d.pois['arena:' + a.id]) reveal(a.x, a.y, 18);
+      }));
+      if (d.pois.final) reveal(D.FINAL_ARENA.x, D.FINAL_ARENA.y, 20);
+      if (this.player) this.revealTerrainAt(this.player.x, this.player.y, 34, true);
+      if (!silent) this.saveSoon();
+    },
+
+    terrainPct() {
+      if (!this.explored) return 0;
+      let n = 0;
+      for (let i = 0; i < this.explored.length; i++) n += this.explored[i] ? 1 : 0;
+      return Math.round(n / this.explored.length * 100);
+    },
+
     loadDiscovery(data) {
       const base = this.freshDiscovery();
       if (data && data.zones) {
@@ -636,6 +725,7 @@
       this.discovery.pois[key] = true;
       this.toast('DÉCOUVERT · ' + label, color || '#ffe6a0');
       if (this.player) this.fx.ring(this.player.x, this.player.y - 10, color || '#ffe6a0', 28, 0.55);
+      this.revealTerrainAt(x, y, 18, true);
       if (kind === 'final') window.AudioSys.sfx('warp');
       if (window.Quests) window.Quests.onDiscovery(kind, id);
       this.saveSoon();
@@ -659,7 +749,8 @@
         outposts, outpostsTotal: D.OUTPOSTS.length,
         shrines, shrinesTotal: D.SHRINES.length,
         arenas, arenasTotal: arenaTotal,
-        final: !!final
+        final: !!final,
+        terrainPct: this.terrainPct()
       };
     },
 
@@ -670,6 +761,7 @@
       this.discoveryClock = 0.45;
       if (!this.discovery) this.discovery = this.freshDiscovery();
       const p = this.player;
+      if (this.revealTerrainAt(p.x, p.y, 34, true)) this.saveSoon();
       const zone = this.currentZone();
       if (!this.discovery.zones[zone.id]) {
         this.discovery.zones[zone.id] = true;
@@ -782,7 +874,7 @@
         playerData.y = this.interiorReturn.y;
       }
       const data = {
-        version: 3,
+        version: 4,
         date: Date.now(),
         zone: this.interior ? this.zoneId : this.currentZone().id,
         player: playerData,
@@ -792,6 +884,12 @@
         lastShrine: this.lastShrine,
         shopStocks: this.shopStocks || {},
         discovery: this.discovery || this.freshDiscovery(),
+        exploration: this.explored ? {
+          chunk: CHUNK,
+          size: CHUNK_W,
+          bits: this.encodeExplored()
+        } : null,
+        waypoint: this.waypoint ? { x: Math.round(this.waypoint.x), y: Math.round(this.waypoint.y) } : null,
         quests: window.Quests ? window.Quests.serialize() : null
       };
       return U.storage.set(D.SAVE_KEY, data);
@@ -834,6 +932,15 @@
         if (oldMap) this.toast('Carte agrandie : votre héros reprend au village.', '#ffe6a0');
       }
       this.discovery = this.loadDiscovery(data.discovery);
+      const savedExplored = this.loadExploration(data.exploration);
+      this.explored = savedExplored;
+      if (!savedExplored) {
+        this.explored = this.freshExplored();
+        this.seedExplorationFromDiscovery(true);
+      }
+      this.exploredVersion = (this.exploredVersion || 0) + 1;
+      this.waypoint = data.waypoint && typeof data.waypoint.x === 'number' && typeof data.waypoint.y === 'number'
+        ? { x: data.waypoint.x, y: data.waypoint.y } : null;
       this.discoveryClock = 0.8;
       if (window.Quests) window.Quests.load(data.quests);
       this.questDialogQueue = [];
@@ -883,6 +990,10 @@
       this.player.lastSafe = { x: spawn.x, y: spawn.y };
       this.lastShrine = "Sanctuaire d'Aurore";
       this.discovery = this.freshDiscovery();
+      this.explored = this.freshExplored();
+      this.exploredVersion = (this.exploredVersion || 0) + 1;
+      this.waypoint = null;
+      this.revealTerrainAt(spawn.x, spawn.y, 34, true);
       this.discoveryClock = 0.8;
       if (window.Quests) window.Quests.reset();
       this.questDialogQueue = [];
@@ -1402,12 +1513,16 @@
       const drawables = [];
       for (const d of this.world.getVisibleDecor(rcX, rcY, VIEW_W, VIEW_H)) {
         if (!d.img) continue;
-        drawables.push({ y: d.y, img: d.img, x: d.x });
+        drawables.push({
+          y: d.y, img: d.img, x: d.x,
+          sway: SWAY_TYPES[d.type] || 0,
+          tall: d.type === 'tree' || d.type === 'dead-tree'
+        });
       }
       for (const o of this.world.getVisibleInteractables(rcX, rcY, VIEW_W, VIEW_H)) {
         if (o.kind === 'monolith' && o.hidden) continue;
         if (!o.img) continue;
-        drawables.push({ y: o.y, img: o.img, x: o.x, interactable: true });
+        drawables.push({ y: o.y, img: o.img, x: o.x, interactable: true, kind: o.kind });
       }
       for (const e of this.enemies) {
         if (e.dead) continue;
@@ -1426,11 +1541,37 @@
       for (const d of drawables) {
         if (d.draw) { d.draw(); continue; }
         const img = d.img;
-        ctx.drawImage(img, Math.round(d.x - img.width / 2 - rcX), Math.round(d.y - img.height - rcY));
+        const dx = Math.round(d.x - img.width / 2 - rcX);
+        const dy = Math.round(d.y - img.height - rcY);
+        if (d.kind === 'npc') {
+          Art.drawShadow(ctx, d.x - rcX, d.y - rcY - 1, Math.max(12, img.width * 0.5), 5, 0.62);
+        }
+        if (d.sway && img.height >= 6) {
+          const ph = U.hash2(Math.round(d.x), Math.round(d.y), 7331) * Math.PI * 2;
+          const wave = Math.sin(this.time * 1.15 + ph);
+          const amp = d.tall ? 1.7 : 0.9;
+          const topOff = Math.round(wave * amp);
+          const midOff = Math.round(wave * amp * 0.45);
+          if (topOff || midOff) {
+            const h = img.height;
+            const h1 = Math.round(h * 0.42);
+            const h2 = Math.round(h * 0.3);
+            const h3 = h - h1 - h2;
+            // bandes ancrées en bas, cime décalée : le pixel art reste net
+            ctx.drawImage(img, 0, h - h1, img.width, h1, dx, dy + h - h1, img.width, h1);
+            ctx.drawImage(img, 0, h3, img.width, h2 + 1, dx + midOff, dy + h3, img.width, h2 + 1);
+            ctx.drawImage(img, 0, 0, img.width, h3 + 1, dx + topOff, dy, img.width, h3 + 1);
+            continue;
+          }
+        }
+        ctx.drawImage(img, dx, dy);
       }
 
       for (const p of this.projectiles) p.draw(ctx, rcX, rcY, this.time);
       this.fx.drawOver(ctx, rcX, rcY, this.time);
+      this.fx.drawClouds(ctx, rcX, rcY, this.time, this.zoneId);
+      this.fx.drawGrade(ctx, this.zoneId, this.time);
+      this.fx.drawAmbience(ctx, this.zoneId, this.time, rcX, rcY);
       this.fx.drawWeather(ctx);
       this.drawQuestMarkers(ctx, rcX, rcY);
 
@@ -1451,13 +1592,6 @@
       }
 
       if (this.state === 'playing') UI.drawHUD(ctx, this);
-
-      // légère vignette d'ambiance
-      const vg = ctx.createRadialGradient(320, 180, 210, 320, 180, 390);
-      vg.addColorStop(0, 'rgba(8,6,12,0)');
-      vg.addColorStop(1, 'rgba(8,6,12,0.34)');
-      ctx.fillStyle = vg;
-      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
 
       this.drawFade(ctx);
     }

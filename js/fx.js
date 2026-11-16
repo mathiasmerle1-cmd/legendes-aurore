@@ -18,6 +18,49 @@
     volcano: { count: 48, colors: ['#ffb45d', '#ff7c49', '#7a6a66'], vy: 9, vx: 5, size: 1 }
   };
 
+  /* Ambiance colorée de chaque terre : lumière, ombre et vignette. */
+  const GRADE = {
+    plains: { light: 'rgba(255, 232, 160, 0.11)', shade: 'rgba(38, 66, 106, 0.15)', vig: '18, 14, 8', va: 0.3 },
+    forest: { light: 'rgba(152, 222, 150, 0.08)', shade: 'rgba(8, 36, 26, 0.22)', vig: '4, 18, 12', va: 0.42 },
+    desert: { light: 'rgba(255, 214, 130, 0.16)', shade: 'rgba(88, 54, 92, 0.1)', vig: '46, 28, 14', va: 0.28 },
+    swamp: { light: 'rgba(150, 190, 120, 0.06)', shade: 'rgba(14, 44, 36, 0.24)', vig: '6, 20, 16', va: 0.46 },
+    tundra: { light: 'rgba(200, 240, 255, 0.13)', shade: 'rgba(32, 62, 102, 0.17)', vig: '14, 30, 48', va: 0.34 },
+    volcano: { light: 'rgba(255, 158, 86, 0.13)', shade: 'rgba(48, 14, 18, 0.24)', vig: '30, 8, 10', va: 0.47 }
+  };
+
+  let cloudTex = null;
+
+  /* Texture de nuages raccordable : les taches sont répétées sur les bords
+     pour éviter les coutures quand on la fait défiler. */
+  function buildCloudTexture() {
+    const W = 240, H = 135;
+    const c = U.makeCanvas(W, H);
+    const ctx = c.getContext('2d');
+    const rng = U.mulberry32(987654321);
+    for (let i = 0; i < 10; i++) {
+      const x = rng() * W, y = rng() * H;
+      const r = 20 + rng() * 42;
+      const a = 0.06 + rng() * 0.07;
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          ctx.save();
+          ctx.translate(dx * W, dy * H);
+          const g = ctx.createRadialGradient(x, y, 1, x, y, r);
+          g.addColorStop(0, 'rgba(14, 20, 36, ' + a.toFixed(3) + ')');
+          g.addColorStop(0.55, 'rgba(14, 20, 36, ' + (a * 0.55).toFixed(3) + ')');
+          g.addColorStop(1, 'rgba(14, 20, 36, 0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+    }
+    return c;
+  }
+
+
   const FX = {
     list: [],
     particles: [],
@@ -407,6 +450,181 @@
         }
       }
       ctx.globalAlpha = 1;
+    },
+
+    /* Ombres de nuages : une texture douce qui dérive au-dessus du monde. */
+    drawClouds(ctx, camX, camY, time, zoneId) {
+      if (!cloudTex) cloudTex = buildCloudTexture();
+      const scale = 3;
+      const tw = cloudTex.width * scale;
+      const th = cloudTex.height * scale;
+      const vw = ctx.canvas.width, vh = ctx.canvas.height;
+      const ox = ((time * 7 - camX * 0.3) % tw + tw) % tw;
+      const oy = ((time * 3.5 - camY * 0.2) % th + th) % th;
+      const strength = zoneId === 'volcano' ? 0.45 : zoneId === 'desert' ? 0.5 : zoneId === 'tundra' ? 0.55 : 0.85;
+      ctx.save();
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.globalAlpha = strength;
+      for (let ty = -1; ty <= Math.ceil(vh / th); ty++) {
+        for (let tx = -1; tx <= Math.ceil(vw / tw); tx++) {
+          ctx.drawImage(cloudTex, tx * tw - ox, ty * th - oy, tw, th);
+        }
+      }
+      ctx.restore();
+    },
+
+    /* Colorimétrie par biome et vignette douce. */
+    drawGrade(ctx, zoneId, time) {
+      const vw = ctx.canvas.width, vh = ctx.canvas.height;
+      const g = GRADE[zoneId] || GRADE.plains;
+      const grad = ctx.createLinearGradient(0, 0, vw, vh);
+      grad.addColorStop(0, g.light);
+      grad.addColorStop(0.52, 'rgba(0, 0, 0, 0)');
+      grad.addColorStop(1, g.shade);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, vw, vh);
+
+      const breathe = 0.02 + Math.sin(time * 0.25) * 0.012;
+      const light = ctx.createRadialGradient(vw * 0.42, vh * 0.32, 10, vw * 0.42, vh * 0.32, vh * 0.9);
+      light.addColorStop(0, 'rgba(255, 246, 214, ' + breathe.toFixed(3) + ')');
+      light.addColorStop(1, 'rgba(255, 246, 214, 0)');
+      ctx.fillStyle = light;
+      ctx.fillRect(0, 0, vw, vh);
+
+      const vg = ctx.createRadialGradient(vw * 0.5, vh * 0.47, vh * 0.3, vw * 0.5, vh * 0.52, vh * 0.84);
+      vg.addColorStop(0, 'rgba(' + g.vig + ', 0)');
+      vg.addColorStop(0.62, 'rgba(' + g.vig + ', ' + (g.va * 0.34).toFixed(3) + ')');
+      vg.addColorStop(1, 'rgba(' + g.vig + ', ' + g.va.toFixed(3) + ')');
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, vw, vh);
+    },
+
+    /* Ambiances propres à chaque terre : rayons, brume, chaleur, givre. */
+    drawAmbience(ctx, zoneId, time, camX, camY) {
+      if (!zoneId || zoneId === 'plains') return;
+      const vw = ctx.canvas.width, vh = ctx.canvas.height;
+      ctx.save();
+
+      if (zoneId === 'forest') {
+        // Rayons de soleil obliques entre les fûts, très légers.
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 4; i++) {
+          const ph = time * 0.16 + i * 1.9;
+          const base = ((i * 181 + Math.sin(ph) * 24) % (vw + 160)) - 80;
+          const slant = Math.sin(ph * 0.6) * 12;
+          const w = 18 + i * 10;
+          const a = 0.85 + Math.sin(time * 0.4 + i) * 0.15;
+          const g = ctx.createLinearGradient(base, 0, base + 90 + slant, vh);
+          g.addColorStop(0, 'rgba(255, 244, 200, 0)');
+          g.addColorStop(0.28, 'rgba(255, 244, 200, ' + (0.065 * a).toFixed(3) + ')');
+          g.addColorStop(0.72, 'rgba(255, 244, 200, ' + (0.03 * a).toFixed(3) + ')');
+          g.addColorStop(1, 'rgba(255, 244, 200, 0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.moveTo(base, 0);
+          ctx.lineTo(base + w, 0);
+          ctx.lineTo(base + w + 90 + slant, vh);
+          ctx.lineTo(base + 90 + slant, vh);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.globalCompositeOperation = 'source-over';
+      } else if (zoneId === 'swamp') {
+        // Nappes de brume basses qui dérivent entre les racines.
+        for (let i = 0; i < 5; i++) {
+          const y = vh * (0.5 + i * 0.1) + Math.sin(time * 0.18 + i) * 5;
+          const h = 16 + i * 5;
+          const gy = ctx.createLinearGradient(0, y, 0, y + h);
+          gy.addColorStop(0, 'rgba(190, 230, 196, 0)');
+          gy.addColorStop(0.42, 'rgba(190, 230, 196, ' + (0.04 + i * 0.005).toFixed(3) + ')');
+          gy.addColorStop(1, 'rgba(190, 230, 196, 0)');
+          ctx.fillStyle = gy;
+          ctx.fillRect(0, y, vw, h);
+        }
+        for (let i = 0; i < 4; i++) {
+          const x = ((i * 167 + time * 7 + Math.sin(time * 0.12 + i * 1.7) * 48) % (vw + 240)) - 120;
+          const y = vh * (0.55 + (i % 3) * 0.11) + Math.sin(time * 0.2 + i) * 6;
+          const rx = 70 + i * 24, ry = 18 + i * 4;
+          const g = ctx.createRadialGradient(x, y, 1, x, y, rx);
+          g.addColorStop(0, 'rgba(198, 234, 202, 0.045)');
+          g.addColorStop(1, 'rgba(198, 234, 202, 0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else if (zoneId === 'desert') {
+        // Halo solaire et ondes de chaleur.
+        const sun = ctx.createRadialGradient(vw * 0.18, vh * 0.05, 2, vw * 0.18, vh * 0.05, vh * 1.15);
+        sun.addColorStop(0, 'rgba(255, 242, 196, 0.17)');
+        sun.addColorStop(0.45, 'rgba(255, 224, 158, 0.05)');
+        sun.addColorStop(1, 'rgba(255, 224, 158, 0)');
+        ctx.fillStyle = sun;
+        ctx.fillRect(0, 0, vw, vh);
+        ctx.globalCompositeOperation = 'screen';
+        for (let i = 0; i < 3; i++) {
+          const y = vh * (0.44 + i * 0.18) + Math.sin(time * 0.85 + i * 2.1) * 5;
+          const g = ctx.createLinearGradient(0, y, 0, y + 20);
+          g.addColorStop(0, 'rgba(255, 228, 172, 0)');
+          g.addColorStop(0.5, 'rgba(255, 228, 172, 0.04)');
+          g.addColorStop(1, 'rgba(255, 228, 172, 0)');
+          ctx.fillStyle = g;
+          ctx.fillRect(0, y, vw, 20);
+        }
+        ctx.globalCompositeOperation = 'source-over';
+      } else if (zoneId === 'tundra') {
+        // Scintillements de givre ancrés au sol.
+        const cell = 46;
+        const gx0 = Math.floor(camX / cell) - 1, gy0 = Math.floor(camY / cell) - 1;
+        const gx1 = Math.ceil((camX + vw) / cell), gy1 = Math.ceil((camY + vh) / cell);
+        ctx.fillStyle = '#eaffff';
+        for (let gy = gy0; gy <= gy1; gy++) {
+          for (let gx = gx0; gx <= gx1; gx++) {
+            const r = U.hash2(gx, gy, 4411);
+            if (r < 0.52) continue;
+            const x = (gx + 0.2 + U.hash2(gx, gy, 97) * 0.6) * cell - camX;
+            const y = (gy + 0.2 + U.hash2(gx, gy, 53) * 0.6) * cell - camY;
+            if (x < -4 || x > vw + 4 || y < -4 || y > vh + 4) continue;
+            const tw = Math.sin(time * 2.1 + r * 40);
+            if (tw < 0.74) continue;
+            const a = (tw - 0.74) / 0.26;
+            ctx.globalAlpha = a * 0.82;
+            ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+            if (a > 0.78) {
+              ctx.globalAlpha = a * 0.28;
+              ctx.fillRect(Math.round(x) - 1, Math.round(y), 3, 1);
+              ctx.fillRect(Math.round(x), Math.round(y) - 1, 1, 3);
+            }
+          }
+        }
+        ctx.globalAlpha = 1;
+      } else if (zoneId === 'volcano') {
+        // Lueur de lave au bas de l'écran et voile de cendres.
+        const pulse = 0.055 + Math.sin(time * 1.15) * 0.022;
+        const glow = ctx.createRadialGradient(vw * 0.5, vh * 1.08, 8, vw * 0.5, vh * 1.08, vh * 1.0);
+        glow.addColorStop(0, 'rgba(255, 122, 52, ' + pulse.toFixed(3) + ')');
+        glow.addColorStop(0.45, 'rgba(255, 92, 40, ' + (pulse * 0.4).toFixed(3) + ')');
+        glow.addColorStop(1, 'rgba(255, 92, 40, 0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, 0, vw, vh);
+        const haze = ctx.createLinearGradient(0, 0, 0, vh * 0.5);
+        haze.addColorStop(0, 'rgba(28, 16, 22, 0.1)');
+        haze.addColorStop(1, 'rgba(28, 16, 22, 0)');
+        ctx.fillStyle = haze;
+        ctx.fillRect(0, 0, vw, vh * 0.5);
+        for (let i = 0; i < 2; i++) {
+          const y = vh * (0.55 + i * 0.24) + Math.sin(time * 0.7 + i * 2.4) * 6;
+          const g = ctx.createLinearGradient(0, y, 0, y + 24);
+          g.addColorStop(0, 'rgba(255, 170, 96, 0)');
+          g.addColorStop(0.5, 'rgba(255, 170, 96, 0.032)');
+          g.addColorStop(1, 'rgba(255, 170, 96, 0)');
+          ctx.fillStyle = g;
+          ctx.fillRect(0, y, vw, 24);
+        }
+      }
+
+      ctx.restore();
     }
   };
 

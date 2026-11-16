@@ -19,18 +19,21 @@ Le jeu fonctionne hors ligne une fois la page chargée. La sauvegarde est stock�
 | E / Entrée | Interagir |
 | I / Tab | Inventaire et équipement |
 | L | Journal des quêtes |
-| M | Carte du monde |
+| M | Carte du monde (clic : poser un repère, clic droit : l'effacer) |
 | Échap | Pause |
 | N | Couper la musique |
 
 ## Contenu
 
 - Monde ouvert de 480 × 480 tuiles, 6 biomes.
+- Carte détaillée avec relief, courbes de niveau, côtes, routes, brume de guerre persistante et texturée, infobulles de lieux et fil d'Ariane vers la quête suivie.
+- Repère personnel posé d'un clic sur la carte, avec boussole et distance dans le HUD ; clic droit pour l'effacer.
 - Villages et avant-postes sûrs, 12 coffres répartis dans les camps.
 - 3 classes, éditeur de personnage, origines, équipement sur 5 slots.
 - Monstres nivelés, élites, mini-boss et 6 Gardiens de biome, boss final Nyx.
 - 8 quêtes principales et 16 quêtes annexes, journal de quêtes sur `L`.
 - Matériaux de monstre, amélioration à la forge, vendeurs spécialisés, sanctuaires, sauvegarde locale.
+- Rendu procédural : transitions de biomes par dithering, eau et lave animées, écume sur les rives, végétation qui ondule, ombres de nuages, ambiances propres à chaque terre (rayons de forêt, brume des marais, chaleur du désert, givre de la toundra, lueur volcanique) et colorimétrie par biome.
 
 ## Développement
 
