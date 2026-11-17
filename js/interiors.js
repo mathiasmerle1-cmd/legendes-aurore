@@ -473,6 +473,192 @@
     });
   }
 
+  function nightstandSprite(wood, cloth) {
+    return prop('nightstand:' + wood + ':' + (cloth || ''), 24, 30, (ctx, w, h) => {
+      shadow(ctx, w / 2, h - 2, 9, 2);
+      R(ctx, 3, 11, w - 6, h - 13, U.shade(wood, -24));
+      R(ctx, 4, 12, w - 8, h - 15, wood);
+      R(ctx, 4, 12, w - 8, 2, U.shade(wood, 20));
+      R(ctx, 6, 16, w - 12, 6, U.shade(wood, 9));
+      R(ctx, 6, 17, w - 12, 1, U.shade(wood, -22));
+      R(ctx, w / 2 - 2, 18, 4, 1, '#d8b45c');
+      R(ctx, 8, h - 6, 2, 5, U.shade(wood, -32));
+      R(ctx, w - 10, h - 6, 2, 5, U.shade(wood, -32));
+      if (cloth) R(ctx, 4, 24, w - 8, 4, cloth);
+      // chandelle
+      R(ctx, 15, 2, 3, 8, '#efe6d0');
+      R(ctx, 16, 1, 1, 3, '#e5c476');
+      R(ctx, 16, -1, 2, 2, '#ffcf54');
+      R(ctx, 13, 10, 8, 2, '#b8a888');
+    });
+  }
+
+  function basketSprite(kind) {
+    const content = kind === 'herbs' ? '#7fae5c' : kind === 'yarn' ? '#c98a9a' : kind === 'toys' ? '#5f8fc9' : '#c95f55';
+    return prop('basket:' + kind, 26, 20, (ctx, w, h) => {
+      shadow(ctx, w / 2, h - 2, 10, 2);
+      E(ctx, w / 2, 9, 10, 4, '#c49a62');
+      E(ctx, w / 2 - 3, 8, 3, 3, content);
+      E(ctx, w / 2 + 3, 7, 3, 3, U.shade(content, 14));
+      R(ctx, 3, 9, w - 6, h - 10, '#a87c4a');
+      R(ctx, 4, 10, w - 8, h - 13, '#c49a62');
+      for (let y = 12; y < h - 4; y += 3) R(ctx, 4, y, w - 8, 1, '#8b6338');
+      for (let x = 6; x < w - 5; x += 4) R(ctx, x, 10, 1, h - 13, '#ad8150');
+      R(ctx, 2, 7, w - 4, 3, '#8b6338');
+      R(ctx, 3, 7, w - 6, 1, '#c9a26c');
+      ctx.strokeStyle = '#8b6338'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(w / 2, 7, 8, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
+      R(ctx, 4, h - 3, 4, 2, '#7a5a36');
+      R(ctx, w - 8, h - 3, 4, 2, '#7a5a36');
+    });
+  }
+
+  function coatRackSprite(wood, cloth) {
+    return prop('coatrack:' + wood + ':' + cloth, 26, 52, (ctx, w, h) => {
+      shadow(ctx, w / 2, h - 3, 8, 3);
+      R(ctx, w / 2 - 1, 10, 3, h - 12, U.shade(wood, -22));
+      R(ctx, w / 2, 10, 1, h - 13, U.shade(wood, 18));
+      R(ctx, w / 2 - 9, h - 6, 19, 3, U.shade(wood, -30));
+      R(ctx, w / 2 - 11, h - 4, 5, 3, U.shade(wood, -36));
+      R(ctx, w / 2 + 7, h - 4, 5, 3, U.shade(wood, -36));
+      R(ctx, w / 2 - 9, 12, 8, 2, U.shade(wood, -8));
+      R(ctx, w / 2 + 3, 10, 8, 2, U.shade(wood, -8));
+      R(ctx, w / 2 - 12, 7, 8, 2, U.shade(wood, 8));
+      // manteau
+      R(ctx, w / 2 - 10, 14, 11, 25, cloth);
+      R(ctx, w / 2 - 9, 15, 9, 2, U.shade(cloth, 20));
+      R(ctx, w / 2 - 9, 22, 3, 13, U.shade(cloth, -14));
+      R(ctx, w / 2 - 4, 14, 2, 20, U.shade(cloth, 12));
+      R(ctx, w / 2 - 11, 38, 13, 2, U.shade(cloth, -22));
+      // chapeau
+      E(ctx, w / 2 + 4, 20, 6, 2, '#5c4a3a');
+      R(ctx, w / 2 + 1, 15, 7, 5, '#6f5844');
+      R(ctx, w / 2 + 2, 16, 5, 1, '#8f7454');
+    });
+  }
+
+  function benchSprite(wood, cloth) {
+    return prop('bench:' + wood + ':' + (cloth || ''), 38, 24, (ctx, w, h) => {
+      shadow(ctx, w / 2, h - 2, 14, 3);
+      R(ctx, 4, 10, 3, 12, U.shade(wood, -26));
+      R(ctx, w - 7, 10, 3, 12, U.shade(wood, -26));
+      R(ctx, 2, 8, w - 4, 6, wood);
+      R(ctx, 3, 9, w - 6, 2, U.shade(wood, 20));
+      R(ctx, 2, 14, w - 4, 2, U.shade(wood, -24));
+      if (cloth) {
+        R(ctx, 8, 7, w - 16, 4, cloth);
+        R(ctx, 9, 7, w - 18, 1, U.shade(cloth, 22));
+        for (let x = 8; x < w - 10; x += 5) R(ctx, x, 10, 1, 2, U.shade(cloth, -22));
+      }
+      R(ctx, 4, 16, 2, 5, U.shade(wood, -32));
+      R(ctx, w - 6, 16, 2, 5, U.shade(wood, -32));
+    });
+  }
+
+  function logStackSprite(wood) {
+    return prop('logs:' + wood, 36, 24, (ctx, w, h) => {
+      shadow(ctx, w / 2, h - 2, 13, 3);
+      const log = (x, y, len) => {
+        R(ctx, x, y, len, 6, U.shade(wood, -18));
+        R(ctx, x, y + 1, len, 2, wood);
+        E(ctx, x + len, y + 3, 2, 3, U.shade(wood, 20));
+        E(ctx, x + len, y + 3, 1, 2, U.shade(wood, -28));
+      };
+      log(3, 14, 28);
+      log(5, 8, 26);
+      log(2, 2, 27);
+      R(ctx, 9, 2, 2, 18, U.shade(wood, -30));
+      R(ctx, 25, 2, 2, 18, U.shade(wood, -30));
+      R(ctx, 8, 1, 20, 2, U.shade(wood, 12));
+      R(ctx, 12, 12, 1, 3, '#8a6a45');
+    });
+  }
+
+  function armorStandSprite(metal, cloth) {
+    return prop('armor:' + metal + ':' + cloth, 30, 56, (ctx, w, h) => {
+      shadow(ctx, w / 2, h - 3, 10, 3);
+      R(ctx, 5, h - 8, 3, 7, '#5d432e');
+      R(ctx, w - 8, h - 8, 3, 7, '#5d432e');
+      R(ctx, 4, h - 10, w - 8, 3, '#5d432e');
+      R(ctx, w / 2 - 1, 14, 3, 34, '#6b4a30');
+      // plastron
+      R(ctx, w / 2 - 8, 14, 16, 18, U.shade(metal, -20));
+      R(ctx, w / 2 - 7, 15, 14, 15, metal);
+      R(ctx, w / 2 - 5, 17, 10, 2, U.shade(metal, 22));
+      R(ctx, w / 2 - 6, 25, 12, 2, U.shade(metal, -26));
+      R(ctx, w / 2 - 1, 16, 2, 14, U.shade(metal, 10));
+      // épaulières
+      E(ctx, w / 2 - 9, 16, 4, 3, U.shade(metal, -8));
+      E(ctx, w / 2 + 9, 16, 4, 3, U.shade(metal, -8));
+      // casque
+      E(ctx, w / 2, 9, 6, 6, U.shade(metal, 6));
+      R(ctx, w / 2 - 4, 10, 8, 3, U.shade(metal, -16));
+      R(ctx, w / 2 - 2, 8, 4, 1, U.shade(metal, 28));
+      R(ctx, w / 2 - 3, 13, 6, 1, '#3d3430');
+      // tabard
+      R(ctx, w / 2 - 6, 32, 12, 14, cloth);
+      R(ctx, w / 2 - 5, 33, 10, 1, U.shade(cloth, 22));
+      R(ctx, w / 2 - 1, 33, 2, 11, U.shade(cloth, -18));
+      // lance
+      R(ctx, 26, 2, 2, 48, '#7a5a3a');
+      R(ctx, 25, 0, 4, 5, '#c9d5dc');
+      R(ctx, 26, 1, 1, 3, '#eef7fb');
+    });
+  }
+
+  function bookStackSprite() {
+    return prop('bookstack', 24, 18, (ctx, w, h) => {
+      shadow(ctx, w / 2, h - 2, 9, 2);
+      const rows = [
+        [3, 12, 18, 4, '#a1493f', '#c96a58'],
+        [5, 8, 15, 4, '#4f6f93', '#7b9bbd'],
+        [4, 4, 17, 4, '#c8a85a', '#e5ca80']
+      ];
+      rows.forEach(([x, y, ww, hh, c, l]) => {
+        R(ctx, x, y, ww, hh, c);
+        R(ctx, x + 1, y + 1, ww - 2, 1, l);
+        R(ctx, x + ww - 2, y + 1, 1, hh - 2, '#efe2c2');
+      });
+      E(ctx, 19, 2, 3, 3, '#6fa05a');
+      R(ctx, 19, 1, 1, 2, '#8cbf72');
+    });
+  }
+
+  function sideboardSprite(wood, items) {
+    return prop('sideboard:' + wood + ':' + items, 44, 36, (ctx, w, h) => {
+      shadow(ctx, w / 2, h - 2, 16, 3);
+      R(ctx, 3, 12, w - 6, h - 14, U.shade(wood, -24));
+      R(ctx, 4, 13, w - 8, h - 17, wood);
+      R(ctx, 4, 13, w - 8, 2, U.shade(wood, 20));
+      R(ctx, 6, 18, w / 2 - 8, 11, U.shade(wood, 8));
+      R(ctx, w / 2 + 2, 18, w / 2 - 8, 11, U.shade(wood, 5));
+      R(ctx, 7, 19, w / 2 - 10, 1, U.shade(wood, -20));
+      R(ctx, w / 2 + 3, 19, w / 2 - 10, 1, U.shade(wood, -20));
+      R(ctx, w / 2 - 3, 22, 2, 3, '#d8b45c');
+      R(ctx, w / 2 + 1, 22, 2, 3, '#d8b45c');
+      R(ctx, 5, h - 6, 3, 4, U.shade(wood, -34));
+      R(ctx, w - 8, h - 6, 3, 4, U.shade(wood, -34));
+      if (items === 'jars') {
+        [[9, 6], [18, 4], [30, 6]].forEach(([x, y], i) => {
+          const cols = ['#8fbf6e', '#c47f5a', '#7fa8c4'];
+          R(ctx, x, y + 4, 5, 8, '#d5d0be');
+          R(ctx, x + 1, y + 6, 3, 4, cols[i]);
+          R(ctx, x, y + 3, 5, 2, '#e8e2d0');
+        });
+      } else if (items === 'bowls') {
+        E(ctx, 12, 8, 6, 3, '#d8c9a6'); E(ctx, 12, 7, 5, 2, '#efe2c2');
+        E(ctx, 26, 9, 5, 3, '#c9a26a'); E(ctx, 26, 8, 4, 2, '#e5c884');
+        R(ctx, 20, 4, 3, 8, '#e0d6c0');
+      } else {
+        R(ctx, 8, 4, 10, 8, '#7f9db4');
+        R(ctx, 9, 5, 8, 2, '#a8c2d4');
+        R(ctx, 22, 6, 9, 6, '#b6715b');
+        R(ctx, 23, 7, 7, 1, '#d39a80');
+        R(ctx, 32, 3, 4, 9, '#d7caa4');
+      }
+    });
+  }
+
   function teddySprite() {
     return prop('teddy', 22, 26, (ctx, w, h) => {
       shadow(ctx, w / 2, h - 3, 7, 2);
@@ -849,6 +1035,31 @@
       R(ctx, rx + 4 + i * 12, ry + rh, 1, 3, rug.accent);
       R(ctx, rx + 4 + i * 12, ry - 3, 1, 3, rug.accent);
     }
+    // paillasson devant la porte : l'entrée reste lisible et dégagée
+    const mx = DOOR_X - 26, my = ROOM_H - 22;
+    R(ctx, mx, my, 52, 18, '#6f5334');
+    R(ctx, mx + 2, my + 2, 48, 14, '#b99a62');
+    R(ctx, mx + 4, my + 4, 44, 10, '#cbae74');
+    for (let i = 0; i < 9; i++) {
+      R(ctx, mx + 4 + i * 5, my + 5, 1, 8, '#a3814f');
+      R(ctx, mx + 4 + i * 5 + 2, my + 7, 2, 1, '#e0c68a');
+    }
+    R(ctx, mx + 8, my + 14, 36, 1, '#8c6d42');
+    for (let i = 0; i < 9; i++) R(ctx, mx + 4 + i * 5, my + 16, 2, 2, '#8c6d42');
+  }
+
+  function drawSconce(ctx, cx, y) {
+    R(ctx, cx - 1, y, 3, 14, '#5d4a3a');
+    R(ctx, cx - 1, y, 1, 12, '#8a6f52');
+    R(ctx, cx - 8, y + 11, 17, 2, '#4a3a2e');
+    R(ctx, cx - 8, y + 9, 2, 4, '#4a3a2e');
+    R(ctx, cx + 7, y + 9, 2, 4, '#4a3a2e');
+    R(ctx, cx - 3, y + 1, 7, 2, '#4a3a2e');
+    R(ctx, cx - 2, y + 3, 5, 8, '#efe4cc');
+    R(ctx, cx - 1, y + 4, 3, 1, '#fff8e0');
+    E(ctx, cx, y - 3, 3, 4, '#ffb347');
+    R(ctx, cx, y - 5, 1, 2, '#ffe6a0');
+    R(ctx, cx - 5, y + 13, 11, 1, 'rgba(0,0,0,0.16)');
   }
 
   function drawWalls(ctx, theme, rng, seed) {
@@ -875,6 +1086,9 @@
     drawWindow(ctx, 34, 12, 62, 32, theme);
     drawWallArt(ctx, theme.art[0], 148, 10, seed);
     drawWallArt(ctx, theme.art[1], 286, 10, seed + 17);
+    // appliques : deux petites lumières qui réchauffent la pièce
+    drawSconce(ctx, 120, 28);
+    drawSconce(ctx, 264, 28);
     // murs latéraux
     R(ctx, 0, WALL_H, 12, ROOM_H - WALL_H, '#2e2632');
     R(ctx, 10, WALL_H, 2, ROOM_H - WALL_H, '#17131d');
@@ -935,84 +1149,193 @@
       lore.push({ kind: 'lore', x, y, name, lines, action: action || 'EXAMINER', img });
     };
 
+    // Petites histoires de mobilier, propres à chaque maison.
+    const BED_LORE = {
+      herbes: [
+        'Un lit simple, tapissé de ballots de menthe qui parfument le sommeil.',
+        'Sous l’oreiller, un carnet de remèdes griffonné à la hâte.'
+      ],
+      chasseur: [
+        'Le lit est recouvert d’une peau de bête épaisse et un peu rêche.',
+        'Une corde et un couteau sont posés à portée de main, même la nuit.'
+      ],
+      tisserand: [
+        'Le lit disparaît sous un patchwork de chutes de tissu, chaque carré d’une couleur différente.',
+        'On y dort comme dans un nuage de laine.'
+      ],
+      savoir: [
+        'Un lit étroit, coincé entre deux rayonnages, avec un livre ouvert sur la couverture.',
+        'La chandelle de chevet est presque entièrement fondue.'
+      ],
+      cuisine: [
+        'Le lit sent la farine chaude et le bois de four.',
+        'Une croûte de pain traîne sur la table de chevet, entamée.'
+      ],
+      musique: [
+        'Le lit est défait, comme si quelqu’un venait de se lever pour noter un air.',
+        'Une corde de luth remplace le lacet du rideau.'
+      ],
+      enfant: [
+        'Un petit lit couvert de coussins et de peluches entassées.',
+        'Sous le matelas, on devine un trésor de cailloux brillants.'
+      ],
+      garde: [
+        'Un lit de garnison, fait au carré, avec l’épée suspendue juste au-dessus.',
+        'La couverture est raide de pluie séchée et de nuits courtes.'
+      ]
+    };
+
     if (theme.id === 'herbes') {
-      add(shelfSprite('jars', '#8a6a45', 'herbes'), 82, 128, 44, 46);
-      add(shelfSprite('herbs', '#8a6a45', 'herbes2'), 304, 128, 44, 46);
-      add(tableSprite('herbs', '#8a633d', null, 'herbes'), 148, 208, 40, 22);
-      add(cauldronSprite('#86c46a'), 292, 216, 24, 18);
-      add(plantSprite('#6f9a52'), 42, 240, 14, 10);
-      add(plantSprite('#7fae5c'), 344, 240, 14, 10);
-      add(Art.crate(), 116, 244, 18, 14);
-      lights.push({ x: 292, y: 202, r: 82, color: '#9fe07a', seed: 1 });
-      addLore(304, 150, 'Étagère d’herbes', theme.loreShelf, 'LIRE');
-      addLore(292, 230, 'Chaudron', theme.loreCauldron, 'EXAMINER');
+      add(shelfSprite('jars', '#8a6a45', 'herbesA'), 62, 128, 44, 46);
+      add(shelfSprite('herbs', '#8a6a45', 'herbesB'), 138, 128, 44, 46);
+      add(wardrobeSprite('#7a5a3a', '#8fae6d'), 324, 146, 30, 50);
+      add(tableSprite('herbs', '#8a633d', null, 'herbes'), 238, 162, 40, 22);
+      add(cauldronSprite('#86c46a'), 300, 222, 24, 18);
+      add(bedSprite('#8d6a4a', '#6b4a30', 'herbes'), 64, 202, 32, 44);
+      add(nightstandSprite('#7a5a3a', '#8fae6d'), 98, 196, 20, 18);
+      add(chairSprite('#6b4a30', true), 230, 178, 0, 0);
+      add(basketSprite('herbs'), 274, 246, 20, 14);
+      add(Art.crate(), 344, 242, 18, 14);
+      add(Art.barrel(), 60, 244, 16, 16);
+      add(plantSprite('#6f9a52'), 36, 240, 14, 10);
+      lights.push({ x: 300, y: 204, r: 86, color: '#9fe07a', seed: 1 });
+      lights.push({ x: 238, y: 148, r: 64, color: theme.light, seed: 3, ember: false });
+      addLore(138, 150, 'Étagère d’herbes', theme.loreShelf, 'LIRE');
+      addLore(300, 230, 'Chaudron', theme.loreCauldron, 'EXAMINER');
+      addLore(98, 204, 'Lit de l’herboriste', BED_LORE.herbes, 'EXAMINER');
     } else if (theme.id === 'chasseur') {
-      add(fireplaceSprite('#8f8778', wood), 192, 130, 52, 38);
-      add(bedSprite('#8d5a3f', '#6b4a30', 'chasseur'), 64, 180, 32, 44);
-      add(rackSprite(wood), 320, 180, 38, 40);
-      add(tableSprite('map', '#7c5737', null, 'chasseur'), 140, 216, 40, 22);
-      add(Art.crate(), 268, 242, 18, 14);
-      add(Art.barrel(), 292, 238, 16, 16);
-      lights.push({ x: 192, y: 112, r: 96, color: '#ffb667', seed: 2 });
-      addLore(192, 144, 'Cheminée', theme.loreFire, 'EXAMINER');
-      addLore(320, 194, 'Râtelier d’armes', theme.loreRack, 'EXAMINER');
+      add(fireplaceSprite('#8f8778', wood), 192, 134, 52, 38);
+      add(shelfSprite('jars', '#8a6a45', 'chasseurA'), 60, 128, 44, 46);
+      add(rackSprite(wood), 322, 184, 38, 40);
+      add(bedSprite('#8d5a3f', '#6b4a30', 'chasseur'), 64, 202, 32, 44);
+      add(nightstandSprite('#6b4a30', null), 98, 196, 20, 18);
+      add(tableSprite('map', '#7c5737', null, 'chasseur'), 124, 226, 40, 22);
+      add(chairSprite('#6b4a30', false), 88, 238, 0, 0);
+      add(benchSprite(wood, '#7a4f38'), 252, 244, 34, 14);
+      add(logStackSprite(wood), 240, 156, 28, 14);
+      add(sideboardSprite('#6b4a30', 'jars'), 272, 194, 40, 28);
+      add(basketSprite('food'), 292, 248, 20, 14);
+      add(Art.barrel(), 332, 244, 16, 16);
+      add(plantSprite('#6f9a52'), 36, 240, 14, 10);
+      lights.push({ x: 192, y: 112, r: 100, color: '#ffb667', seed: 2 });
+      addLore(192, 146, 'Cheminée', theme.loreFire, 'EXAMINER');
+      addLore(322, 198, 'Râtelier d’armes', theme.loreRack, 'EXAMINER');
+      addLore(98, 204, 'Lit du chasseur', BED_LORE.chasseur, 'EXAMINER');
     } else if (theme.id === 'tisserand') {
-      add(loomSprite('#7a5a3a', '#7f9db4'), 90, 186, 44, 38);
-      add(wardrobeSprite('#7a5a3a', '#b6715b'), 316, 174, 30, 50);
-      add(shelfSprite('jars', '#8a6a45', 'tisserand'), 68, 128, 44, 46);
-      add(tableSprite('fabrics', '#8a633d', '#b9c6ce', 'tisserand'), 220, 212, 40, 22);
-      add(plantSprite('#6f9a52'), 344, 240, 14, 10);
-      add(Art.barrel(), 148, 244, 16, 16);
-      addLore(90, 200, 'Métier à tisser', theme.loreLoom, 'EXAMINER');
-      addLore(316, 188, 'Armoire à étoffes', theme.loreWardrobe, 'EXAMINER');
+      add(loomSprite('#7a5a3a', '#7f9db4'), 82, 196, 44, 38);
+      add(wardrobeSprite('#7a5a3a', '#b6715b'), 318, 170, 30, 50);
+      add(shelfSprite('jars', '#8a6a45', 'tisserandA'), 62, 128, 44, 46);
+      add(shelfSprite('fabrics', '#6e7a82', 'tisserandB'), 138, 128, 44, 46);
+      add(bedSprite('#7f9db4', '#6b4a30', 'tisserand'), 316, 234, 32, 44);
+      add(nightstandSprite('#6b4a30', '#b6715b'), 280, 228, 20, 18);
+      add(tableSprite('fabrics', '#8a633d', '#b9c6ce', 'tisserand'), 128, 224, 40, 22);
+      add(chairSprite('#6b4a30', false), 92, 240, 0, 0);
+      add(chairSprite('#6b4a30', true), 168, 206, 0, 0);
+      add(basketSprite('yarn'), 236, 248, 20, 14);
+      add(Art.barrel(), 344, 244, 16, 16);
+      add(plantSprite('#6f9a52'), 36, 240, 14, 10);
+      lights.push({ x: 128, y: 208, r: 64, color: theme.light, seed: 5, ember: false });
+      addLore(82, 206, 'Métier à tisser', theme.loreLoom, 'EXAMINER');
+      addLore(318, 190, 'Armoire à étoffes', theme.loreWardrobe, 'EXAMINER');
+      addLore(280, 236, 'Lit de la tisserande', BED_LORE.tisserand, 'EXAMINER');
     } else if (theme.id === 'savoir') {
-      add(shelfSprite('books', '#7a5533', 'savoir1'), 76, 128, 44, 46);
-      add(shelfSprite('books', '#7a5533', 'savoir2'), 140, 128, 44, 46);
-      add(shelfSprite('books', '#7a5533', 'savoir3'), 310, 128, 44, 46);
-      add(tableSprite('books', '#75502f', null, 'savoir'), 208, 210, 40, 22);
-      add(chairSprite('#6b4a30', false), 166, 224, 0, 0);
-      add(globeSprite(), 300, 216, 16, 14);
-      add(plantSprite('#6f9a52'), 42, 240, 14, 10);
-      addLore(140, 150, 'Rayonnages', theme.loreShelf, 'LIRE');
-      addLore(208, 224, 'Bureau', theme.loreDesk, 'LIRE');
+      add(shelfSprite('books', '#7a5533', 'savoir1'), 62, 128, 44, 46);
+      add(shelfSprite('books', '#7a5533', 'savoir3'), 138, 128, 44, 46);
+      add(shelfSprite('books', '#7a5533', 'savoir2'), 316, 128, 44, 46);
+      add(bedSprite('#8d6a4a', '#5d432e', 'savoir'), 64, 208, 32, 44);
+      add(nightstandSprite('#5d432e', null), 98, 202, 20, 18);
+      add(tableSprite('books', '#75502f', null, 'savoir'), 140, 212, 40, 22);
+      add(chairSprite('#6b4a30', false), 126, 230, 0, 0);
+      add(sideboardSprite('#6b4a30', 'cloth'), 298, 172, 40, 28);
+      add(globeSprite(), 300, 222, 16, 14);
+      add(bookStackSprite(), 264, 246, 0, 0);
+      add(basketSprite('linen'), 340, 244, 20, 14);
+      add(plantSprite('#6f9a52'), 38, 240, 14, 10);
+      lights.push({ x: 298, y: 160, r: 68, color: theme.light, seed: 6, ember: false });
+      addLore(138, 150, 'Rayonnages', theme.loreShelf, 'LIRE');
+      addLore(140, 226, 'Bureau', theme.loreDesk, 'LIRE');
+      addLore(98, 210, 'Lit de l’érudit', BED_LORE.savoir, 'EXAMINER');
     } else if (theme.id === 'cuisine') {
-      add(fireplaceSprite('#9b9381', wood), 192, 132, 52, 38);
-      add(shelfSprite('jars', '#8a6a45', 'cuisine1'), 76, 128, 44, 46);
-      add(shelfSprite('jars', '#8a6a45', 'cuisine2'), 308, 128, 44, 46);
-      add(tableSprite('bread', '#8a633d', '#c8814e', 'cuisine'), 132, 216, 40, 22);
-      add(cauldronSprite('#c9a45c'), 260, 206, 24, 18);
-      add(sackSprite(), 302, 244, 18, 12);
-      add(Art.crate(), 334, 244, 18, 14);
-      lights.push({ x: 192, y: 114, r: 98, color: '#ffb35e', seed: 4 });
+      add(fireplaceSprite('#9b9381', wood), 192, 134, 52, 38);
+      add(shelfSprite('jars', '#8a6a45', 'cuisineA'), 62, 128, 44, 46);
+      add(shelfSprite('jars', '#8a6a45', 'cuisineB'), 318, 128, 44, 46);
+      add(sideboardSprite('#8a6240', 'bowls'), 318, 196, 40, 28);
+      add(tableSprite('bread', '#8a633d', '#c8814e', 'cuisine'), 128, 226, 40, 22);
+      add(chairSprite('#6b4a30', false), 90, 240, 0, 0);
+      add(chairSprite('#6b4a30', true), 160, 204, 0, 0);
+      add(cauldronSprite('#c9a45c'), 260, 214, 24, 18);
+      add(bedSprite('#c8814e', '#6a4a2f', 'cuisine'), 64, 204, 32, 44);
+      add(nightstandSprite('#6a4a2f', '#c8814e'), 98, 198, 20, 18);
+      add(logStackSprite(wood), 240, 154, 26, 14);
+      add(sackSprite(), 298, 246, 18, 12);
+      add(Art.crate(), 340, 246, 18, 14);
+      add(basketSprite('food'), 272, 248, 20, 14);
+      add(plantSprite('#6f9a52'), 36, 240, 14, 10);
+      lights.push({ x: 192, y: 114, r: 100, color: '#ffb35e', seed: 4 });
+      lights.push({ x: 318, y: 184, r: 58, color: theme.light, seed: 7, ember: false });
       addLore(192, 146, 'Âtre', theme.loreFire, 'EXAMINER');
-      addLore(132, 230, 'Table du pain', theme.loreTable, 'EXAMINER');
+      addLore(128, 238, 'Table du pain', theme.loreTable, 'EXAMINER');
+      addLore(98, 206, 'Lit du boulanger', BED_LORE.cuisine, 'EXAMINER');
     } else if (theme.id === 'musique') {
-      add(bedSprite('#8f7ab4', '#6b4a30', 'musique'), 62, 180, 32, 44);
-      add(luteSprite(), 316, 184, 14, 30);
-      add(drumSprite(), 278, 240, 18, 12);
-      add(tableSprite('music', '#7c5737', '#8f7ab4', 'musique'), 214, 212, 40, 22);
-      add(chairSprite('#6b4a30', false), 170, 224, 0, 0);
-      add(chairSprite('#6b4a30', true), 258, 224, 0, 0);
-      add(plantSprite('#6f9a52'), 344, 240, 14, 10);
-      addLore(316, 198, 'Luth', theme.loreLute, 'EXAMINER');
-      addLore(278, 248, 'Tambour', theme.loreDrum, 'EXAMINER');
-    } else if (theme.id === 'enfant') {
-      add(bedSprite('#e0b45d', '#8a633d', 'enfant'), 64, 174, 32, 44);
-      add(toyboxSprite(), 306, 220, 22, 14);
-      add(tableSprite('toys', '#8a633d', null, 'enfant'), 156, 216, 40, 22);
-      add(teddySprite(), 250, 242, 0, 0);
+      add(bedSprite('#8f7ab4', '#6b4a30', 'musique'), 64, 200, 32, 44);
+      add(nightstandSprite('#6b4a30', '#8f7ab4'), 98, 194, 20, 18);
+      add(wardrobeSprite('#6b4a30', '#8f7ab4'), 322, 136, 30, 50);
+      add(luteSprite(), 320, 188, 14, 30);
+      add(shelfSprite('jars', '#8a6a45', 'musiqueA'), 62, 128, 44, 46);
+      add(tableSprite('music', '#7c5737', '#8f7ab4', 'musique'), 136, 224, 40, 22);
+      add(chairSprite('#6b4a30', false), 100, 238, 0, 0);
+      add(chairSprite('#6b4a30', true), 168, 204, 0, 0);
+      add(sideboardSprite('#6b4a30', 'cloth'), 230, 160, 40, 28);
+      add(drumSprite(), 264, 244, 18, 12);
+      add(basketSprite('yarn'), 300, 246, 20, 14);
       add(Art.crate(), 344, 244, 18, 14);
-      addLore(306, 234, 'Coffre à jouets', theme.loreToybox, 'EXAMINER');
-      addLore(250, 248, 'Ours en peluche', theme.loreTeddy, 'EXAMINER');
+      add(plantSprite('#6f9a52'), 36, 240, 14, 10);
+      lights.push({ x: 230, y: 148, r: 66, color: theme.light, seed: 8, ember: false });
+      addLore(320, 198, 'Luth', theme.loreLute, 'EXAMINER');
+      addLore(264, 250, 'Tambour', theme.loreDrum, 'EXAMINER');
+      addLore(98, 202, 'Lit du musicien', BED_LORE.musique, 'EXAMINER');
+    } else if (theme.id === 'enfant') {
+      add(bedSprite('#e0b45d', '#8a633d', 'enfant'), 64, 180, 32, 44);
+      add(bedSprite('#7fa2b8', '#8a633d', 'enfant2'), 314, 236, 32, 44);
+      add(shelfSprite('fabrics', '#8a633d', 'enfantA'), 62, 128, 44, 46);
+      add(shelfSprite('books', '#8a633d', 'enfantB'), 316, 128, 44, 46);
+      add(tableSprite('toys', '#8a633d', null, 'enfant'), 130, 224, 40, 22);
+      add(chairSprite('#8a633d', true), 94, 238, 0, 0);
+      add(chairSprite('#8a633d', true), 168, 204, 0, 0);
+      add(toyboxSprite(), 262, 244, 22, 14);
+      add(teddySprite(), 236, 248, 0, 0);
+      add(basketSprite('toys'), 102, 248, 20, 14);
+      add(Art.crate(), 344, 244, 18, 14);
+      add(plantSprite('#6f9a52'), 38, 240, 14, 10);
+      lights.push({ x: 130, y: 208, r: 70, color: theme.light, seed: 10, ember: false });
+      addLore(262, 234, 'Coffre à jouets', theme.loreToybox, 'EXAMINER');
+      addLore(236, 248, 'Ours en peluche', theme.loreTeddy, 'EXAMINER');
+      addLore(100, 186, 'Petit lit', BED_LORE.enfant, 'EXAMINER');
     } else {
-      add(bedSprite('#8f4a4a', '#5d432e', 'garde'), 60, 180, 32, 44);
-      add(rackSprite('#5d432e'), 320, 178, 38, 40);
-      add(tableSprite('map', '#747a7e', null, 'garde'), 152, 216, 40, 22);
-      add(Art.crate(), 260, 244, 18, 14);
-      add(Art.barrel(), 284, 240, 16, 16);
-      addLore(320, 192, 'Râtelier de garde', theme.loreRack, 'EXAMINER');
-      addLore(152, 230, 'Carte de la région', theme.loreTable, 'EXAMINER');
+      add(bedSprite('#8f4a4a', '#5d432e', 'garde'), 64, 202, 32, 44);
+      add(nightstandSprite('#5d432e', '#8f4a4a'), 98, 196, 20, 18);
+      add(shelfSprite('jars', '#5d432e', 'gardeA'), 62, 128, 44, 46);
+      add(shelfSprite('books', '#5d432e', 'gardeB'), 312, 128, 44, 46);
+      add(rackSprite('#5d432e'), 322, 186, 38, 40);
+      add(tableSprite('map', '#747a7e', null, 'garde'), 132, 224, 40, 22);
+      add(chairSprite('#5d432e', false), 96, 238, 0, 0);
+      add(armorStandSprite('#aab4ba', '#8f4a4a'), 190, 164, 18, 16);
+      add(benchSprite('#5d432e', '#8f4a4a'), 258, 244, 34, 14);
+      add(logStackSprite('#5d432e'), 236, 154, 26, 14);
+      add(Art.crate(), 340, 244, 18, 14);
+      add(Art.barrel(), 312, 246, 16, 16);
+      add(basketSprite('linen'), 282, 248, 20, 14);
+      add(plantSprite('#6f9a52'), 36, 240, 14, 10);
+      lights.push({ x: 132, y: 208, r: 66, color: theme.light, seed: 11, ember: false });
+      addLore(322, 200, 'Râtelier de garde', theme.loreRack, 'EXAMINER');
+      addLore(132, 238, 'Carte de la région', theme.loreTable, 'EXAMINER');
+      addLore(98, 204, 'Lit de garde', BED_LORE.garde, 'EXAMINER');
     }
+
+    // Appliques murales : la lumière tombe aussi sur le haut de la pièce,
+    // qui reste ainsi vivant au lieu d'être un simple mur vide.
+    lights.push({ x: 120, y: 32, r: 54, color: theme.light, seed: 21, ember: false });
+    lights.push({ x: 264, y: 32, r: 54, color: theme.light, seed: 27, ember: false });
 
     lore.unshift({ kind: 'exit', x: DOOR_X, y: DOOR_Y, name: 'Sortie', action: 'SORTIR' });
 
@@ -1060,6 +1383,7 @@
 
   function drawEmbers(ctx, room, time) {
     room.lights.forEach(l => {
+      if (l.ember === false) return;
       for (let i = 0; i < 6; i++) {
         const t = (time * 0.55 + i * 0.173 + l.seed * 0.13) % 1;
         const x = OX + l.x + Math.sin(time * 1.7 + i * 2.1 + l.seed) * 5;

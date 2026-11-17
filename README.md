@@ -28,7 +28,10 @@ Le jeu fonctionne hors ligne une fois la page chargée. La sauvegarde est stock�
 - Monde ouvert de 480 × 480 tuiles, 6 biomes.
 - Carte détaillée avec relief, courbes de niveau, côtes, routes, brume de guerre persistante et texturée, infobulles de lieux et fil d'Ariane vers la quête suivie.
 - Repère personnel posé d'un clic sur la carte, avec boussole et distance dans le HUD ; clic droit pour l'effacer.
-- Villages et avant-postes sûrs, 12 coffres répartis dans les camps.
+- Villages et avant-postes sûrs, 12 coffres répartis dans les camps, bâtiments aux collisions précises.
+- 7 maisons entièrement meublées : un intérieur unique par maison, avec 12 à 15 meubles, éclairage d'ambiance et objets à examiner.
+- Faune procédurale propre à chaque biome : oiseaux, papillons, écureuils, lapins, renards, lézards, grenouilles, lucioles et libellules, qui fuient le joueur sans jamais engager le combat.
+- Flore variée : fleurs par biome, hautes herbes, buissons à baies, rondins, nénuphars, galets, champignons lumineux et bouleaux.
 - 3 classes, éditeur de personnage, origines, équipement sur 5 slots.
 - Monstres nivelés, élites, mini-boss et 6 Gardiens de biome, boss final Nyx.
 - 8 quêtes principales et 16 quêtes annexes, journal de quêtes sur `L`.

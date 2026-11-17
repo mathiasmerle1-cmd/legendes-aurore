@@ -12,7 +12,7 @@
   const CHUNK = 8;
   const CHUNK_W = Math.ceil(D.WORLD_SIZE / CHUNK);
   /* Décors qui ondulent doucement au vent. */
-  const SWAY_TYPES = { tree: 1, bush: 1, reeds: 1, flower: 1, detail: 1, 'dead-tree': 1 };
+  const SWAY_TYPES = { tree: 1, bush: 1, reeds: 1, flower: 1, grass: 1, lily: 1, detail: 1, 'dead-tree': 1 };
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
@@ -63,6 +63,7 @@
     interiorFadeDir: 0,
     interiorPending: null,
     interiorReturn: null,
+    wildlife: null,
 
     /* ----------------------------------------------------------
        Démarrage
@@ -70,6 +71,7 @@
     init() {
       this.input = new U.Input();
       this.world = new window.World(20260214);
+      this.wildlife = window.Wildlife ? new window.Wildlife(this) : null;
       if (window.Quests) window.Quests.init(this);
       UI.init(this);
       window.Game = this;
@@ -220,6 +222,7 @@
       this.updateArenas(dt);
       this.updateZone(dt);
       this.updateDiscovery(dt);
+      if (this.wildlife) this.wildlife.update(dt);
       this.updateInteractTarget();
     },
 
@@ -941,6 +944,7 @@
       this.exploredVersion = (this.exploredVersion || 0) + 1;
       this.waypoint = data.waypoint && typeof data.waypoint.x === 'number' && typeof data.waypoint.y === 'number'
         ? { x: data.waypoint.x, y: data.waypoint.y } : null;
+      if (this.wildlife) this.wildlife.reset();
       this.discoveryClock = 0.8;
       if (window.Quests) window.Quests.load(data.quests);
       this.questDialogQueue = [];
@@ -993,6 +997,7 @@
       this.explored = this.freshExplored();
       this.exploredVersion = (this.exploredVersion || 0) + 1;
       this.waypoint = null;
+      if (this.wildlife) this.wildlife.reset();
       this.revealTerrainAt(spawn.x, spawn.y, 34, true);
       this.discoveryClock = 0.8;
       if (window.Quests) window.Quests.reset();
@@ -1528,6 +1533,11 @@
         if (e.dead) continue;
         if (e.x < rcX - 100 || e.x > rcX + VIEW_W + 100 || e.y < rcY - 120 || e.y > rcY + VIEW_H + 120) continue;
         drawables.push({ y: e.y, draw: () => e.draw(ctx, rcX, rcY, this.time) });
+      }
+      if (this.wildlife) {
+        for (const c of this.wildlife.getVisible(rcX, rcY, VIEW_W, VIEW_H)) {
+          drawables.push({ y: c.y, draw: () => this.wildlife.drawCritter(ctx, c, rcX, rcY) });
+        }
       }
       if (this.activeBoss && !this.activeBoss.dead) {
         const b = this.activeBoss;

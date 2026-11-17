@@ -235,7 +235,7 @@
           <button class="pixel-btn ghost" id="btn-help">COMMANDES</button>
         </div>
         <div class="save-summary" id="save-summary"></div>
-        <div class="title-note">v1.3 · brume, repères et lumière des terres</div>
+        <div class="title-note">v1.4 · faune, flore et maisons habitées</div>
       </div>
       <div class="title-badge">Cliquez pour activer le son</div>
     `;
@@ -1491,8 +1491,9 @@
     D.ZONES.forEach(z => {
       if (!(disc.zones && disc.zones[z.id])) return;
       const x = px(z.anchor.x * D.TILE + 8), y0 = py(z.anchor.y * D.TILE + 8);
-      // Le village occupe le centre des Plaines : on remonte le cartouche.
-      const y = z.id === 'plains' ? y0 - 17 : y0;
+      // Le village occupe le centre des Plaines : on remonte le cartouche
+      // au-dessus de l'anneau du joueur pour éviter tout chevauchement.
+      const y = z.id === 'plains' ? y0 - 26 : y0;
       const label = z.short;
       const tw = Art.textWidth(label, 1);
       ctx.fillStyle = 'rgba(10,8,16,0.6)';

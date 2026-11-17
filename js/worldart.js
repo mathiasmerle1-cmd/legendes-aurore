@@ -304,12 +304,20 @@
     return deco('tree:' + kind + ':' + variant, 44, 56, (ctx, w, h) => {
       const snow = kind === 'pine_snow';
       const forest = kind === 'forest';
+      const birch = kind === 'birch';
       const pine = kind === 'pine' || snow;
       const rng = U.mulberry32(700 + variant * 7);
       // ombre
       ctx.globalAlpha = 0.18; E(ctx, 22, 52, 17, 4, '#182018'); ctx.globalAlpha = 1;
       // tronc
-      R(ctx, 19, 36, 6, 17, '#6b4a2f'); R(ctx, 20, 36, 2, 15, '#8a6341'); R(ctx, 24, 39, 1, 13, '#4d3422');
+      const trunk = birch ? '#d9d5c6' : '#6b4a2f';
+      const trunkLight = birch ? '#f2eee1' : '#8a6341';
+      const trunkDark = birch ? '#8f8a7c' : '#4d3422';
+      R(ctx, 19, 36, 6, 17, trunk); R(ctx, 20, 36, 2, 15, trunkLight); R(ctx, 24, 39, 1, 13, trunkDark);
+      if (birch) {
+        R(ctx, 19, 40, 2, 1, '#4d4a42'); R(ctx, 23, 44, 2, 1, '#4d4a42');
+        R(ctx, 20, 47, 1, 1, '#5c594f'); R(ctx, 24, 38, 1, 1, '#5c594f');
+      }
       R(ctx, 15, 52, 6, 3, '#5a3f2a'); R(ctx, 25, 52, 6, 3, '#5a3f2a');
       if (pine) {
         const dark = forest ? '#2f5c3a' : '#3e6b4b';
@@ -330,7 +338,9 @@
         R(ctx, 20, 0, 5, 7, dark); R(ctx, 22, 0, 2, 5, mid);
         if (snow) { R(ctx, 21, 1, 3, 2, light); R(ctx, 10, 35, 3, 1, light); R(ctx, 31, 25, 2, 1, light); }
       } else {
-        const crown = kind === 'forest' ? ['#2f6138', '#427b43', '#5b9650', '#75ab5d'] : ['#3d7b3e', '#4d9148', '#6cae57', '#8bc76a'];
+        const crown = birch ? ['#557f3f', '#6d9a4c', '#8dbb5e', '#b5d67e']
+          : kind === 'forest' ? ['#2f6138', '#427b43', '#5b9650', '#75ab5d']
+          : ['#3d7b3e', '#4d9148', '#6cae57', '#8bc76a'];
         E(ctx, 22, 24, 18, 15, crown[0]);
         E(ctx, 15, 22, 10, 10, crown[1]);
         E(ctx, 28, 20, 10, 11, crown[1]);
@@ -431,14 +441,31 @@
   };
 
   Art.flowerPatch = function (kind, variant) {
-    return deco('flowers:' + kind + ':' + variant, 20, 14, (ctx, w, h) => {
-      const cols = kind === 'snow' ? ['#dff0f5', '#b7d7e2', '#f7ffff'] : kind === 'desert' ? ['#d1b15a', '#e5cc80', '#a7c66b'] : ['#f1df73', '#f7f1de', '#d991b3'];
-      for (let i = 0; i < 5; i++) {
-        const x = 2 + (i * 4) % 16, y = 5 + (i * 3) % 7;
-        R(ctx, x, y, 1, 4, kind === 'desert' ? '#8c9849' : '#4b783a');
+    variant = variant || 0;
+    return deco('flowers:' + kind + ':' + variant, 22, 16, (ctx, w, h) => {
+      const palettes = {
+        plains: [['#f1df73', '#f7f1de', '#d991b3'], ['#8fb3e8', '#f7f1de', '#f1df73'], ['#d991b3', '#e8a6c6', '#fff4d8'], ['#e2604f', '#f3c04f', '#f7f1de']],
+        forest: [['#b58ad6', '#e8d9f2', '#f1df73'], ['#8fb3e8', '#d7ecf7', '#f7f1de'], ['#d991b3', '#f7f1de', '#b58ad6'], ['#f1df73', '#fff4d8', '#8fb3e8']],
+        desert: [['#d1b15a', '#e5cc80', '#a7c66b'], ['#e8c98a', '#f6ecc0', '#c79a55'], ['#d99183', '#f1df73', '#f7f1de']],
+        swamp: [['#d8ce6b', '#f1e5a1', '#a9c7d8'], ['#b58ad6', '#e8d9f2', '#f7f1de'], ['#8fc9a0', '#d8ecdd', '#f1df73']],
+        tundra: [['#dff0f5', '#b7d7e2', '#f7ffff'], ['#c9d8f2', '#e8f2ff', '#ffffff'], ['#d8c9f2', '#eee8ff', '#bfe8f2']],
+        volcano: [['#f0a344', '#ffd27a', '#e2604f'], ['#e2604f', '#ffb451', '#f7e0a0'], ['#d8c9a0', '#f0e6c8', '#ff8a4a']]
+      };
+      const all = palettes[kind] || palettes.plains;
+      const cols = all[variant % all.length];
+      const stemCol = kind === 'desert' ? '#8c9849' : kind === 'volcano' ? '#6e4a3d' : kind === 'tundra' ? '#7f9ba0' : '#4b783a';
+      const count = 5 + (variant % 2);
+      for (let i = 0; i < count; i++) {
+        const x = 3 + (i * 5) % 17, y = 6 + (i * 3) % 7;
+        const tall = i % 3 === 0;
+        R(ctx, x, y, 1, tall ? 6 : 4, stemCol);
+        if (tall) R(ctx, x + 1, y + 2, 1, 2, stemCol);
         R(ctx, x - 1, y - 1, 2, 2, cols[i % cols.length]);
         R(ctx, x, y - 1, 1, 1, '#fff7cf');
+        if (variant === 1 && i % 2 === 0) R(ctx, x + 2, y + 2, 1, 1, cols[(i + 1) % cols.length]);
       }
+      R(ctx, 2, 13, 7, 1, stemCol);
+      R(ctx, 13, 14, 7, 1, stemCol);
     }, '#28212d');
   };
 
@@ -531,6 +558,167 @@
       E(ctx, 14, 11, 12, 4, '#c9dce5'); E(ctx, 13, 9, 9, 4, '#effaff');
       R(ctx, 5, 8, 6, 1, '#ffffff'); R(ctx, 18, 10, 4, 1, '#dff1f7');
     }, 'rgba(0,0,0,0)');
+  };
+
+  /* Flore haute : touffes, buissons à baies, rondins et fleurs des rives. */
+  Art.tallGrass = function (kind, variant) {
+    variant = variant || 0;
+    return deco('tallgrass:' + kind + ':' + variant, 26, 24, (ctx, w, h) => {
+      const cols = {
+        plains: ['#4f8b3d', '#6caa4e', '#a8c76a'],
+        forest: ['#3f6d3d', '#5d8f4c', '#86ae62'],
+        desert: ['#a18a4d', '#c0a864', '#ddc887'],
+        swamp: ['#4c6638', '#6a8350', '#8fa56a'],
+        tundra: ['#8faeb6', '#bfd7dc', '#e8f6f8'],
+        volcano: ['#674539', '#8a5a45', '#b07a58']
+      };
+      const c = cols[kind] || cols.plains;
+      const rng = U.mulberry32(910 + variant * 17 + kind.length * 3);
+      for (let i = 0; i < 9; i++) {
+        const x = 3 + Math.floor(rng() * 20);
+        const top = 3 + Math.floor(rng() * 9);
+        const sway = i % 3 === 0 ? 1 : 0;
+        R(ctx, x, top, 1, 22 - top, c[i % 2]);
+        R(ctx, x + 1, top + 3, 1, 14 - top, c[1]);
+        if (i % 4 === 0) {
+          R(ctx, x - 1, top - 2, 3, 1, c[2]);
+          R(ctx, x, top - 3, 1, 1, kind === 'tundra' ? '#f5ffff' : '#d8c86a');
+        }
+        if (sway) R(ctx, x + 2, top + 5, 1, 2, c[2]);
+      }
+      R(ctx, 2, 21, 22, 2, c[0]);
+      R(ctx, 5, 22, 14, 1, c[1]);
+    }, 'rgba(0,0,0,0)');
+  };
+
+  Art.berryBush = function (kind, variant) {
+    variant = variant || 0;
+    return deco('berrybush:' + kind + ':' + variant, 28, 24, (ctx, w, h) => {
+      const snow = kind === 'tundra';
+      const palettes = {
+        plains: ['#3f7238', '#5b9349', '#7fb65b', '#d94f5c'],
+        forest: ['#315d36', '#477a41', '#659c52', '#b45a8a'],
+        desert: ['#6d7a3f', '#8b9854', '#aab36a', '#d8a34a'],
+        swamp: ['#3d5a36', '#547348', '#728f5b', '#c9d06a'],
+        tundra: ['#6f8d98', '#91afb8', '#bdd6dc', '#d94f5c'],
+        volcano: ['#4f3833', '#6c4b40', '#8d6453', '#ffb451']
+      };
+      const c = palettes[kind] || palettes.plains;
+      E(ctx, 14, 18, 11, 5, U.shade(c[0], -14));
+      E(ctx, 13, 14, 9, 7, c[0]);
+      E(ctx, 8, 12, 5, 6, c[1]); E(ctx, 18, 11, 5, 6, c[1]);
+      E(ctx, 13, 9, 6, 5, c[2]);
+      R(ctx, 6, 8, 4, 2, c[2]); R(ctx, 18, 17, 4, 2, c[1]);
+      if (snow) {
+        R(ctx, 7, 8, 9, 2, '#f5fdff'); R(ctx, 18, 13, 5, 1, '#e8f6fa');
+      } else {
+        for (let i = 0; i < 6; i++) {
+          const bx = 7 + (i * 7) % 15, by = 9 + (i * 5) % 11;
+          R(ctx, bx, by, 2, 2, c[3]);
+          R(ctx, bx, by, 1, 1, '#ffe9c0');
+        }
+      }
+    }, '#28212d');
+  };
+
+  Art.fallenLog = function (kind, variant) {
+    variant = variant || 0;
+    return deco('log:' + kind + ':' + variant, 36, 22, (ctx, w, h) => {
+      const snow = kind === 'tundra';
+      const wood = kind === 'desert' ? '#8a6840' : kind === 'volcano' ? '#4f3a34' : '#5e4430';
+      const bark = kind === 'desert' ? '#a98552' : kind === 'volcano' ? '#6d4d43' : '#7a5a3c';
+      const moss = kind === 'forest' || kind === 'swamp' ? '#5f8a4a' : kind === 'tundra' ? '#cfe8ee' : '#8a9a4e';
+      ctx.globalAlpha = 0.2; E(ctx, 18, 18, 15, 4, '#1c171f'); ctx.globalAlpha = 1;
+      E(ctx, 17, 12, 15, 6, wood);
+      R(ctx, 4, 8, 27, 9, bark);
+      R(ctx, 5, 9, 25, 2, U.shade(bark, 15));
+      R(ctx, 8, 12, 18, 1, U.shade(wood, -16));
+      E(ctx, 32, 13, 3, 4, U.shade(wood, -24));
+      E(ctx, 32, 13, 2, 3, U.shade(wood, 12));
+      R(ctx, 10, 7, 9, 2, moss);
+      R(ctx, 22, 16, 8, 2, moss);
+      if (variant) {
+        R(ctx, 14, 6, 1, 2, '#d5c9a0'); R(ctx, 13, 5, 3, 1, '#b9514e');
+        R(ctx, 25, 5, 2, 2, '#6b8e55');
+      }
+      if (snow) { R(ctx, 5, 7, 24, 2, '#f2fbfd'); R(ctx, 8, 16, 13, 1, '#e3f3f7'); }
+    }, '#2a222c');
+  };
+
+  Art.lilyPads = function (kind, variant) {
+    variant = variant || 0;
+    return deco('lily:' + kind + ':' + variant, 30, 18, (ctx, w, h) => {
+      const pad = kind === 'tundra' ? '#a9c8cc' : kind === 'swamp' ? '#567a45' : '#5f9a52';
+      const light = kind === 'tundra' ? '#e4f4f6' : '#83b96a';
+      const flower = kind === 'swamp' ? '#e8d9f2' : kind === 'tundra' ? '#f7ffff' : '#f3d6e2';
+      const pads = [[8, 9, 6, 4], [19, 12, 5, 3], [24, 6, 4, 3]];
+      pads.forEach(([x, y, rx, ry], i) => {
+        if (i && variant === 0) return;
+        E(ctx, x, y, rx, ry, pad);
+        E(ctx, x - 1, y - 1, rx - 2, ry - 2, light);
+        // entaille du nénuphar
+        ctx.clearRect(x - 1, y - ry, 2, 2);
+      });
+      R(ctx, 6, 7, 2, 1, flower);
+      if (variant === 2) R(ctx, 22, 4, 2, 1, flower);
+    }, 'rgba(0,0,0,0)');
+  };
+
+  Art.pebbles = function (kind, variant) {
+    variant = variant || 0;
+    return deco('pebbles:' + kind + ':' + variant, 24, 14, (ctx, w, h) => {
+      const pal = kind === 'tundra' ? ['#9fb5c0', '#c4d9e4', '#76909e']
+        : kind === 'volcano' ? ['#5a4b49', '#77645f', '#413431']
+        : kind === 'desert' ? ['#b99a65', '#d3b47d', '#917547']
+        : ['#8b8b84', '#a8a89f', '#676a64'];
+      for (let i = 0; i < 4; i++) {
+        const x = 5 + (i * 5) % 15, y = 6 + (i * 3) % 6;
+        E(ctx, x, y, 3 + (i % 2), 2, pal[i % 2 ? 0 : 2]);
+        R(ctx, x - 1, y - 1, 2, 1, pal[1]);
+      }
+      if (variant === 1) { R(ctx, 3, 11, 2, 1, pal[1]); R(ctx, 18, 9, 2, 1, pal[0]); }
+    }, 'rgba(0,0,0,0)');
+  };
+
+  Art.glowMushrooms = function (kind, variant) {
+    variant = variant || 0;
+    return deco('glowmush:' + kind + ':' + variant, 24, 26, (ctx, w, h) => {
+      const cap = variant ? '#7fe0c8' : '#9f8cf0';
+      const capLight = variant ? '#d8fff2' : '#e0d8ff';
+      const stem = '#d5c9a6';
+      const glow = ctx.createRadialGradient(12, 16, 1, 12, 16, 12);
+      glow.addColorStop(0, U.rgba(cap, 0.25));
+      glow.addColorStop(1, U.rgba(cap, 0));
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 3, 24, 23);
+      const shrooms = [[9, 17, 4], [16, 20, 3], [6, 22, 3]];
+      shrooms.forEach(([x, y, s], i) => {
+        R(ctx, x - 1, y - 7, 2, 8, stem);
+        R(ctx, x - 1, y - 7, 1, 8, U.shade(stem, 12));
+        E(ctx, x, y - 8, s, 2, cap);
+        R(ctx, x - s + 1, y - 9, s * 2 - 2, 1, capLight);
+        R(ctx, x - 1, y - 8, 1, 1, '#f7ffff');
+      });
+      R(ctx, 4, 24, 16, 1, '#3e4a38');
+    }, 'rgba(0,0,0,0)');
+  };
+
+  Art.dryShrub = function (kind, variant) {
+    variant = variant || 0;
+    return deco('dryshrub:' + kind + ':' + variant, 26, 24, (ctx, w, h) => {
+      const c = kind === 'volcano' ? '#6a4b3d' : '#8a7044';
+      const light = kind === 'volcano' ? '#9a6a50' : '#b09460';
+      const rng = U.mulberry32(414 + variant * 31);
+      for (let i = 0; i < 5; i++) {
+        const x = 6 + Math.floor(rng() * 14);
+        const top = 5 + Math.floor(rng() * 8);
+        line(ctx, 13, 21, x, top, c, 1);
+        R(ctx, x, top, 2, 1, light);
+        if (i % 2) line(ctx, x, top + 4, x + (i % 3 ? 3 : -3), top + 1, c, 1);
+      }
+      R(ctx, 8, 21, 11, 2, c);
+      R(ctx, 6, 14, 2, 1, light); R(ctx, 18, 10, 2, 1, light);
+    }, '#2a222c');
   };
 
   Art.obsidian = function (variant) {

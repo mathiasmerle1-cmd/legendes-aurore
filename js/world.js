@@ -52,6 +52,8 @@
       this.spawnPoints = [];
       this.outposts = [];
       this.houses = [];
+      this.buildingRects = [];
+      this.buildingTiles = new Uint8Array(W * H);
       this.village = null;
       this.finalArena = null;
       this.monolith = null;
@@ -391,10 +393,32 @@
       let houseCount = 0;
       const addBuilding = (img, tx, ty, wid, hei, kind) => {
         const x = tx * TS + 8, y = ty * TS + 16;
-        const fp = { w: wid, h: hei, ox: -Math.floor(wid / 2), oy: -hei + 1 };
-        for (let yy = ty - hei + 1; yy <= ty; yy++) {
-          for (let xx = tx - Math.floor(wid / 2); xx < tx - Math.floor(wid / 2) + wid; xx++) {
-            if (inBounds(xx, yy)) this.blocked[key(xx, yy)] = 1;
+        // Emprise réelle du mur (les toits et auvents débordent visuellement).
+        // On bloque des rectangles en pixels plutôt qu'en tuiles : les bâtiments
+        // ne sont pas alignés sur la grille et une collision de tuiles laissait
+        // des murs invisibles (ou traversables) selon l'arrondi.
+        const wallW = img.width * 0.8;
+        const wallY = img.height * 0.47;
+        const wallH = img.height * 0.42;
+        const rect = {
+          x1: x - wallW / 2 + 2,
+          x2: x + wallW / 2 - 2,
+          y1: y - img.height + wallY + 1,
+          y2: y - img.height + wallY + wallH + 2
+        };
+        rect.owner = kind;
+        this.buildingRects.push(rect);
+        // Marque la zone pendant la génération : arbres, décors et monstres
+        // éviteront l'emplacement du bâtiment. La collision finale, elle,
+        // utilise le rectangle précis (voir finalize/canStandAt).
+        const bx1 = Math.floor(rect.x1 / TS), bx2 = Math.floor((rect.x2 - 0.01) / TS);
+        const by1 = Math.floor(rect.y1 / TS), by2 = Math.floor((rect.y2 - 0.01) / TS);
+        for (let yy = by1; yy <= by2; yy++) {
+          for (let xx = bx1; xx <= bx2; xx++) {
+            if (inBounds(xx, yy)) {
+              this.blocked[key(xx, yy)] = 1;
+              this.buildingTiles[key(xx, yy)] = 1;
+            }
           }
         }
         this.addDecor(img, x, y, { type: kind, id: kind });
@@ -594,7 +618,7 @@
     }
 
     scatterDecor(rng) {
-      // petites décorations
+      // Petites décorations : chaque biome a sa palette de fleurs et de sous-bois.
       const start = 5, end = W - 5;
       for (let ty = start; ty < end; ty++) {
         for (let tx = start; tx < end; tx++) {
@@ -602,30 +626,61 @@
           if (this.path[k] || this.blocked[k] || this.special[k] !== SPECIAL_NONE) continue;
           if (this.isNearProtected(tx, ty, 0)) continue;
           const bi = this.biome[k];
-          const r = rng();
-          if (r < 0.055) {
-            // petites décorations
-            const kind = ['plains', 'forest', 'desert', 'swamp', 'tundra', 'volcano'][bi];
-            let img = null;
-            if (bi === 0) {
-              img = rng() < 0.55 ? Art.flowerPatch('plains', rng() < 0.5 ? 0 : 1) : Art.grassTuft('plains');
-            } else if (bi === 1) {
-              img = rng() < 0.4 ? Art.mushroomDeco(0) : rng() < 0.6 ? Art.fern('forest') : Art.grassTuft('forest');
-            } else if (bi === 2) {
-              img = rng() < 0.35 ? Art.bones() : Art.flowerPatch('desert', 0);
-            } else if (bi === 3) {
-              img = rng() < 0.5 ? Art.reeds(0) : rng() < 0.6 ? Art.mushroomDeco(1) : Art.fern('swamp');
-            } else if (bi === 4) {
-              img = rng() < 0.45 ? Art.grassTuft('snow') : rng() < 0.7 ? Art.snowdrift() : Art.fern('snow');
-            } else {
-              img = rng() < 0.5 ? Art.vent() : Art.grassTuft('volcano');
+          const meadow = U.fbm(tx * 0.045, ty * 0.045, this.seed + 909, 2);
+          const flowering = meadow > 0.6;
+          const chance = 0.045 + (flowering ? 0.05 : 0);
+          if (rng() >= chance) continue;
+          let img = null, type = 'detail';
+          if (bi === 0) {
+            if (flowering && rng() < 0.7) { img = Art.flowerPatch('plains', Math.floor(rng() * 4)); type = 'flower'; }
+            else if (rng() < 0.38) { img = Art.tallGrass('plains', Math.floor(rng() * 3)); type = 'grass'; }
+            else if (rng() < 0.62) { img = Art.flowerPatch('plains', Math.floor(rng() * 4)); type = 'flower'; }
+            else if (rng() < 0.9) img = Art.grassTuft('plains');
+            else img = Art.pebbles('plains', Math.floor(rng() * 2));
+          } else if (bi === 1) {
+            if (rng() < 0.28) { img = Art.flowerPatch('forest', Math.floor(rng() * 4)); type = 'flower'; }
+            else if (rng() < 0.46) img = Art.fern('forest');
+            else if (rng() < 0.64) { img = Art.tallGrass('forest', Math.floor(rng() * 3)); type = 'grass'; }
+            else if (rng() < 0.78) img = Art.mushroomDeco(0);
+            else if (rng() < 0.9) { img = Art.glowMushrooms('forest', Math.floor(rng() * 2)); type = 'glowmush'; }
+            else img = Art.pebbles('forest', 0);
+          } else if (bi === 2) {
+            if (rng() < 0.3) img = Art.dryShrub('desert', Math.floor(rng() * 2));
+            else if (rng() < 0.54) img = Art.pebbles('desert', Math.floor(rng() * 2));
+            else if (rng() < 0.74) { img = Art.flowerPatch('desert', Math.floor(rng() * 3)); type = 'flower'; }
+            else if (rng() < 0.9) img = Art.grassTuft('desert');
+            else img = Art.bones();
+          } else if (bi === 3) {
+            if (rng() < 0.32) img = Art.reeds(0);
+            else if (rng() < 0.52) img = Art.fern('swamp');
+            else if (rng() < 0.72) { img = Art.glowMushrooms('swamp', Math.floor(rng() * 2)); type = 'glowmush'; }
+            else if (rng() < 0.88) { img = Art.tallGrass('swamp', Math.floor(rng() * 2)); type = 'grass'; }
+            else img = Art.pebbles('swamp', 0);
+          } else if (bi === 4) {
+            if (rng() < 0.32) img = Art.snowdrift();
+            else if (rng() < 0.54) img = Art.bush('snow');
+            else if (rng() < 0.76) { img = Art.tallGrass('tundra', Math.floor(rng() * 3)); type = 'grass'; }
+            else if (rng() < 0.92) { img = Art.flowerPatch('tundra', Math.floor(rng() * 3)); type = 'flower'; }
+            else img = Art.pebbles('tundra', 0);
+          } else {
+            if (rng() < 0.28) img = Art.dryShrub('volcano', Math.floor(rng() * 2));
+            else if (rng() < 0.5) img = Art.vent();
+            else if (rng() < 0.7) img = Art.pebbles('volcano', Math.floor(rng() * 2));
+            else if (rng() < 0.86) img = Art.grassTuft('volcano');
+            else { img = Art.flowerPatch('volcano', Math.floor(rng() * 3)); type = 'flower'; }
+          }
+          if (img) {
+            const x = tx * TS + 8 + Math.floor(rng() * 7 - 3);
+            const y = ty * TS + 14;
+            this.addDecor(img, x, y, { type });
+            if (type === 'glowmush') {
+              this.emitters.push({ x, y: y - 10, type: 'sparkle', rate: 0.12, timer: rng() * 4, color: bi === 1 ? '#c7b8ff' : '#9fe0c0' });
             }
-            if (img) this.addDecor(img, tx * TS + 8 + Math.floor(rng() * 6 - 3), ty * TS + 14, { type: 'detail' });
           }
         }
       }
 
-      // objets solides : arbres, rochers, cactus, cristaux...
+      // Objets solides : arbres, rochers, cactus, cristaux, rondins...
       for (let ty = 5; ty < H - 5; ty++) {
         for (let tx = 5; tx < W - 5; tx++) {
           const k = key(tx, ty);
@@ -637,33 +692,47 @@
           const roll = rng();
           let img = null, solid = true, fp = { w: 1, h: 1, ox: 0, oy: 0 }, type = 'prop';
           if (bi === 0) {
-            if (roll < 0.018 + cluster * 0.022) { img = Art.tree('plains', rng() < 0.5 ? 0 : 1); type = 'tree'; }
-            else if (roll < 0.034) { img = Art.bush('plains'); solid = false; type = 'bush'; }
-            else if (roll < 0.041) { img = Art.rock('plains', rng() < 0.5 ? 0 : 1); type = 'rock'; }
+            if (roll < 0.018 + cluster * 0.022) {
+              img = rng() < 0.18 ? Art.tree('birch', rng() < 0.5 ? 0 : 1) : Art.tree('plains', rng() < 0.5 ? 0 : 1);
+              type = 'tree';
+            } else if (roll < 0.031) { img = Art.bush('plains'); solid = false; type = 'bush'; }
+            else if (roll < 0.038) { img = Art.berryBush('plains', Math.floor(rng() * 2)); solid = false; type = 'bush'; }
+            else if (roll < 0.045) { img = Art.rock('plains', rng() < 0.5 ? 0 : 1); type = 'rock'; }
+            else if (roll < 0.047) { img = Art.fallenLog('plains', Math.floor(rng() * 2)); type = 'log'; }
           } else if (bi === 1) {
-            if (roll < 0.055 + cluster * 0.035) { img = rng() < 0.65 ? Art.tree('forest', rng() < 0.5 ? 0 : 1) : Art.tree('pine', 0); type = 'tree'; }
-            else if (roll < 0.073) { img = Art.bush('forest'); solid = false; type = 'bush'; }
-            else if (roll < 0.081) { img = Art.stump('forest'); type = 'stump'; }
-            else if (roll < 0.089) { img = Art.rock('forest', 0); type = 'rock'; }
+            if (roll < 0.055 + cluster * 0.035) {
+              const r = rng();
+              img = r < 0.22 ? Art.tree('birch', rng() < 0.5 ? 0 : 1) : r < 0.68 ? Art.tree('forest', rng() < 0.5 ? 0 : 1) : Art.tree('pine', 0);
+              type = 'tree';
+            } else if (roll < 0.071) { img = Art.bush('forest'); solid = false; type = 'bush'; }
+            else if (roll < 0.081) { img = Art.berryBush('forest', Math.floor(rng() * 2)); solid = false; type = 'bush'; }
+            else if (roll < 0.089) { img = Art.stump('forest'); type = 'stump'; }
+            else if (roll < 0.096) { img = Art.rock('forest', 0); type = 'rock'; }
+            else if (roll < 0.1) { img = Art.fallenLog('forest', Math.floor(rng() * 2)); type = 'log'; }
           } else if (bi === 2) {
-            if (roll < 0.02 + cluster * 0.025) { img = Art.cactus(rng() < 0.5 ? 0 : 1); type = 'cactus'; }
+            if (roll < 0.02 + cluster * 0.025) { img = Art.cactus(Math.floor(rng() * 3)); type = 'cactus'; }
             else if (roll < 0.042) { img = Art.rock('desert', rng() < 0.5 ? 0 : 1); type = 'rock'; }
             else if (roll < 0.048) { img = Art.bones(); solid = false; type = 'bones'; }
           } else if (bi === 3) {
             if (roll < 0.03 + cluster * 0.03) { img = Art.tree('dead', 0); type = 'dead-tree'; }
-            else if (roll < 0.055) { img = Art.reeds(1); solid = false; type = 'reeds'; }
-            else if (roll < 0.064) { img = Art.stump('swamp'); type = 'stump'; }
-            else if (roll < 0.073) { img = Art.rock('swamp', 0); type = 'rock'; }
+            else if (roll < 0.052) { img = Art.reeds(1); solid = false; type = 'reeds'; }
+            else if (roll < 0.061) { img = Art.stump('swamp'); type = 'stump'; }
+            else if (roll < 0.07) { img = Art.rock('swamp', 0); type = 'rock'; }
+            else if (roll < 0.074) { img = Art.fallenLog('swamp', Math.floor(rng() * 2)); type = 'log'; }
           } else if (bi === 4) {
             if (roll < 0.045 + cluster * 0.04) { img = Art.tree('pine_snow', rng() < 0.5 ? 0 : 1); type = 'tree'; }
-            else if (roll < 0.058) { img = Art.iceCrystal(rng() < 0.5 ? 0 : 1); type = 'crystal'; }
-            else if (roll < 0.071) { img = Art.rock('tundra', rng() < 0.5 ? 0 : 1); type = 'rock'; }
-            else if (roll < 0.08) { img = Art.stump('snow'); type = 'stump'; }
+            else if (roll < 0.055) { img = Art.bush('snow'); solid = false; type = 'bush'; }
+            else if (roll < 0.066) { img = Art.iceCrystal(rng() < 0.5 ? 0 : 1); type = 'crystal'; }
+            else if (roll < 0.077) { img = Art.rock('tundra', rng() < 0.5 ? 0 : 1); type = 'rock'; }
+            else if (roll < 0.085) { img = Art.stump('snow'); type = 'stump'; }
+            else if (roll < 0.087) { img = Art.berryBush('tundra', 0); solid = false; type = 'bush'; }
           } else {
             if (roll < 0.03 + cluster * 0.025) { img = Art.obsidian(rng() < 0.5 ? 0 : 1); type = 'obsidian'; }
-            else if (roll < 0.055) { img = Art.lavaRock(rng() < 0.5 ? 0 : 1); type = 'lava-rock'; }
-            else if (roll < 0.07) { img = Art.rock('volcano', 0); type = 'rock'; }
-            else if (roll < 0.074) { img = Art.tree('dead', 1); type = 'dead-tree'; }
+            else if (roll < 0.053) { img = Art.lavaRock(rng() < 0.5 ? 0 : 1); type = 'lava-rock'; }
+            else if (roll < 0.066) { img = Art.rock('volcano', 0); type = 'rock'; }
+            else if (roll < 0.071) { img = Art.tree('dead', 1); type = 'dead-tree'; }
+            else if (roll < 0.074) { img = Art.fallenLog('volcano', Math.floor(rng() * 2)); type = 'log'; }
+            else if (roll < 0.078) { img = Art.dryShrub('volcano', Math.floor(rng() * 2)); solid = false; type = 'bush'; }
           }
           if (img) {
             const jx = tx * TS + 8 + Math.floor(rng() * 8 - 4);
@@ -671,6 +740,34 @@
             this.addDecor(img, jx, jy, { solid, footprint: fp, type });
             if (type === 'tree' || type === 'crystal' || type === 'obsidian') {
               this.emitters.push({ x: jx, y: jy - img.height * 0.6, type: 'leaf', rate: 0.05, timer: rng() * 5, biome: this.biome[k] });
+            }
+          }
+        }
+      }
+
+      // Rives : nénuphars sur l'eau et roseaux sur la terre ferme voisine.
+      const isLand = v => v !== SPECIAL_WATER && v !== SPECIAL_LAVA;
+      const zoneKeys = ['plains', 'forest', 'desert', 'swamp', 'tundra', 'volcano'];
+      for (let ty = 6; ty < H - 6; ty++) {
+        for (let tx = 6; tx < W - 6; tx++) {
+          const k = key(tx, ty);
+          if (this.special[k] !== SPECIAL_WATER) continue;
+          const n = [];
+          [[tx, ty - 1], [tx + 1, ty], [tx, ty + 1], [tx - 1, ty]].forEach(([x, y]) => {
+            if (inBounds(x, y) && isLand(this.special[key(x, y)])) n.push([x, y]);
+          });
+          if (!n.length) continue;
+          const bi = this.biome[k];
+          const roll = rng();
+          if (bi !== 5 && roll < 0.075) {
+            const img = Art.lilyPads(zoneKeys[bi], Math.floor(rng() * 3));
+            this.addDecor(img, tx * TS + 8 + Math.floor(rng() * 7 - 3), ty * TS + 12, { type: 'lily' });
+          }
+          if (roll > 0.945) {
+            const [nx, ny] = n[Math.floor(rng() * n.length)];
+            const nk = key(nx, ny);
+            if (!this.blocked[nk] && this.special[nk] === SPECIAL_NONE && !this.path[nk]) {
+              this.addDecor(Art.reeds(2), nx * TS + 8 + Math.floor(rng() * 5 - 2), ny * TS + 15, { type: 'reeds' });
             }
           }
         }
@@ -799,6 +896,12 @@
     }
 
     finalize() {
+      // La collision des bâtiments repose désormais sur des rectangles en
+      // pixels : on retire leurs tuiles du masque général pour ne plus avoir
+      // de murs invisibles décalés d'une demi-tuile.
+      for (let i = 0; i < this.buildingTiles.length; i++) {
+        if (this.buildingTiles[i]) this.blocked[i] = 0;
+      }
       // Libre autour du point d'apparition du joueur, juste au sud de la fontaine
       const spawnTile = { x: D.VILLAGE.x, y: D.VILLAGE.y + 5 };
       for (let yy = spawnTile.y - 2; yy <= spawnTile.y + 2; yy++) for (let xx = spawnTile.x - 2; xx <= spawnTile.x + 2; xx++) {
@@ -834,12 +937,23 @@
     }
 
     isBlockedPx(x, y) {
-      return this.isBlockedTile(Math.floor(x / TS), Math.floor(y / TS));
+      if (this.isBlockedTile(Math.floor(x / TS), Math.floor(y / TS))) return true;
+      const bw = 4;
+      return this.overlapsBuilding(x - bw, y - bw * 1.5, x + bw, y + 1);
+    }
+
+    overlapsBuilding(x1, y1, x2, y2) {
+      for (const r of this.buildingRects) {
+        if (x2 > r.x1 && x1 < r.x2 && y2 > r.y1 && y1 < r.y2) return true;
+      }
+      return false;
     }
 
     canStandAt(x, y, footW, footH) {
       footW = footW || 10; footH = footH || 8;
-      const x1 = Math.floor((x - footW / 2) / TS), x2 = Math.floor((x + footW / 2 - 0.01) / TS);
+      const fw = footW / 2;
+      if (this.overlapsBuilding(x - fw, y - footH, x + fw, y)) return false;
+      const x1 = Math.floor((x - fw) / TS), x2 = Math.floor((x + fw - 0.01) / TS);
       const y1 = Math.floor((y - footH) / TS), y2 = Math.floor((y - 0.01) / TS);
       for (let ty = y1; ty <= y2; ty++) {
         for (let tx = x1; tx <= x2; tx++) {
@@ -856,10 +970,19 @@
         const nx = e.x + dx;
         if (this.canStandAt(nx, e.y, footW, footH)) { e.x = nx; moved = true; }
         else {
-          // glissement léger
-          const step = Math.sign(dx);
+          // Glissement le long des murs : on tente les deux côtés, du plus
+          // petit écart au plus grand, pour contourner piliers et façades.
+          const dirs = dx > 0 ? [1, -1] : [-1, 1];
+          outerX:
           for (const off of [2, 4, 6]) {
-            if (this.canStandAt(nx, e.y + (e.slidingDir || 1) * off, footW, footH)) { e.x = nx; e.y += (e.slidingDir || 1) * off * 0.35; moved = true; break; }
+            for (const d of dirs) {
+              if (this.canStandAt(nx, e.y + d * off, footW, footH)) {
+                e.x = nx;
+                e.y += d * off * 0.45;
+                moved = true;
+                break outerX;
+              }
+            }
           }
         }
       }
@@ -867,9 +990,17 @@
         const ny = e.y + dy;
         if (this.canStandAt(e.x, ny, footW, footH)) { e.y = ny; moved = true; }
         else {
-          const step = Math.sign(dy);
+          const dirs = dy > 0 ? [1, -1] : [-1, 1];
+          outerY:
           for (const off of [2, 4, 6]) {
-            if (this.canStandAt(e.x + (e.slidingDir || 1) * off, ny, footW, footH)) { e.y = ny; e.x += (e.slidingDir || 1) * off * 0.35; moved = true; break; }
+            for (const d of dirs) {
+              if (this.canStandAt(e.x + d * off, ny, footW, footH)) {
+                e.y = ny;
+                e.x += d * off * 0.45;
+                moved = true;
+                break outerY;
+              }
+            }
           }
         }
       }

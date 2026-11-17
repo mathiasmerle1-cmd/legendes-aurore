@@ -6,7 +6,7 @@
   const D = {};
 
   D.TITLE = "LES LÉGENDES D'AURORE";
-  D.VERSION = '1.3.0';
+  D.VERSION = '1.4.0';
   D.SAVE_KEY = 'legendes_aurore_save_v1';
   /* La carte de référence fait 240 × 240. Le monde final vaut 480 × 480. */
   D.MAP_SCALE = 2;
