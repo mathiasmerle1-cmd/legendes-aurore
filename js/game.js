@@ -1311,7 +1311,7 @@
         const marker = window.Quests.markerFor(npc.id);
         if (!marker) continue;
         const x = npc.x - rcX;
-        const y = npc.y - (npc.img ? npc.img.height : 24) - rcY;
+        const y = npc.y - (npc.img ? npc.img.height : 34) - rcY;
         if (x < -24 || x > VIEW_W + 24 || y < -36 || y > VIEW_H + 36) continue;
         const color = marker === '?' ? '#8ef0a8' : '#ffd76a';
         const bob = Math.sin(this.time * 4.5 + (npc.tx || 0)) * 2;
@@ -1555,7 +1555,7 @@
         const dx = Math.round(d.x - img.width / 2 - rcX);
         const dy = Math.round(d.y - img.height - rcY);
         if (d.kind === 'npc') {
-          Art.drawShadow(ctx, d.x - rcX, d.y - rcY - 1, Math.max(12, img.width * 0.5), 5, 0.62);
+          Art.drawShadow(ctx, d.x - rcX, d.y - rcY - 1, Math.max(16, img.width * 0.55), 6, 0.62);
         }
         if (d.sway && img.height >= 6) {
           const ph = U.hash2(Math.round(d.x), Math.round(d.y), 7331) * Math.PI * 2;

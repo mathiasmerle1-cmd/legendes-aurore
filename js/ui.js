@@ -235,7 +235,7 @@
           <button class="pixel-btn ghost" id="btn-help">COMMANDES</button>
         </div>
         <div class="save-summary" id="save-summary"></div>
-        <div class="title-note">v1.5 · héros sur mesure</div>
+        <div class="title-note">v1.6 · héros façon Stardew</div>
       </div>
       <div class="title-badge">Cliquez pour activer le son</div>
     `;
@@ -629,7 +629,7 @@
     const dir = seq[(this.editorSpinIndex || 0) % 4];
     const frame = Math.floor(t * 4) % 3;
     const img = sheet.frames[dir][frame] || sheet.frames[dir][0];
-    const cx = W / 2, feet = H - 26;
+    const cx = W / 2, feet = H - 12;
     const bob = Math.sin(t * 2.4) * 1.4;
     // sol
     ctx.globalAlpha = 0.5;
@@ -644,13 +644,13 @@
       const pulse = 0.7 + Math.sin(t * 2.2) * 0.3;
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      const grad = ctx.createRadialGradient(cx, feet - 56, 4, cx, feet - 56, 68 + pulse * 8);
+      const grad = ctx.createRadialGradient(cx, feet - 64, 4, cx, feet - 64, 68 + pulse * 8);
       grad.addColorStop(0, U.rgba(auraDef.color, 0.24));
       grad.addColorStop(0.5, U.rgba(auraDef.color, 0.11));
       grad.addColorStop(1, U.rgba(auraDef.color, 0));
       ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.ellipse(cx, feet - 56, 62 + pulse * 4, 74 + pulse * 4, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx, feet - 64, 62 + pulse * 4, 74 + pulse * 4, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 0.4 + pulse * 0.25;
       ctx.strokeStyle = auraDef.color;
@@ -660,8 +660,8 @@
       ctx.stroke();
       ctx.restore();
     }
-    // personnage 6x
-    const s = 6;
+    // personnage 5x
+    const s = 5;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(img, Math.round(cx - img.width * s / 2), Math.round(feet - img.height * s + bob), img.width * s, img.height * s);
     // étincelles

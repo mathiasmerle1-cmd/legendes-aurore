@@ -357,24 +357,24 @@
         const pulse = 0.7 + Math.sin(time * 2.2) * 0.3;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        const grad = ctx.createRadialGradient(px, py - 8, 2, px, py - 8, 23 + pulse * 3);
+        const grad = ctx.createRadialGradient(px, py - 12, 2, px, py - 12, 29 + pulse * 3);
         grad.addColorStop(0, U.rgba(auraDef.color, 0.2));
         grad.addColorStop(0.55, U.rgba(auraDef.color, 0.09));
         grad.addColorStop(1, U.rgba(auraDef.color, 0));
         ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.ellipse(px, py - 8, 21 + pulse * 2, 24 + pulse * 2, 0, 0, Math.PI * 2);
+        ctx.ellipse(px, py - 12, 27 + pulse * 2, 31 + pulse * 2, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.globalAlpha = 0.35 + pulse * 0.25;
         ctx.strokeStyle = auraDef.color;
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.ellipse(px, py - 1, 12 + pulse * 2, 5 + pulse, 0, 0, Math.PI * 2);
+        ctx.ellipse(px, py - 1, 15 + pulse * 2, 6 + pulse, 0, 0, Math.PI * 2);
         ctx.stroke();
         for (let i = 0; i < 3; i++) {
           const a = time * 1.1 + i * 2.1;
-          const rx = px + Math.cos(a) * (11 + Math.sin(time * 1.7 + i) * 3);
-          const ry = py - 10 + Math.sin(a * 1.4) * (13 + Math.cos(time + i) * 2);
+          const rx = px + Math.cos(a) * (14 + Math.sin(time * 1.7 + i) * 3);
+          const ry = py - 14 + Math.sin(a * 1.4) * (18 + Math.cos(time + i) * 2);
           ctx.globalAlpha = 0.32 + Math.sin(time * 3 + i * 1.7) * 0.18;
           ctx.fillRect(Math.round(rx), Math.round(ry), 2, 2);
         }
@@ -382,7 +382,7 @@
         ctx.restore();
       }
       // ombre douce et pixelisée
-      Art.drawShadow(ctx, px, py - 1, 19, 7, 0.95);
+      Art.drawShadow(ctx, px, py - 1, 25, 8, 0.95);
 
       // aura d'invulnérabilité
       if (this.dodgeTimer > 0 || this.invuln > 0.45) {
@@ -390,7 +390,7 @@
         ctx.strokeStyle = this.dodgeTimer > 0 ? '#9fe8ff' : '#ffe3a0';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.ellipse(px, py - 9, 10, 15, 0, 0, Math.PI * 2);
+        ctx.ellipse(px, py - 13, 14, 19, 0, 0, Math.PI * 2);
         ctx.stroke();
         ctx.globalAlpha = 1;
       }
@@ -407,13 +407,13 @@
         const a = this.attackAngle;
         const t = 1 - this.attackAnim / 0.24;
         ctx.save();
-        ctx.translate(px, py - 13);
+        ctx.translate(px, py - 18);
         ctx.rotate(a);
         ctx.globalAlpha = Math.max(0, 1 - t) * 0.8;
         ctx.strokeStyle = this.style.color;
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(0, 0, 17, -0.9 + t * 1.4, 0.4 + t * 1.4);
+        ctx.arc(0, 0, 22, -0.9 + t * 1.4, 0.4 + t * 1.4);
         ctx.stroke();
         ctx.restore();
         ctx.globalAlpha = 1;
