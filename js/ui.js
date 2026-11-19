@@ -235,7 +235,7 @@
           <button class="pixel-btn ghost" id="btn-help">COMMANDES</button>
         </div>
         <div class="save-summary" id="save-summary"></div>
-        <div class="title-note">v1.6 · héros façon Stardew</div>
+        <div class="title-note">v1.6.1 · visages affinés</div>
       </div>
       <div class="title-badge">Cliquez pour activer le son</div>
     `;

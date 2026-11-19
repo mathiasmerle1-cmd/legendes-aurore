@@ -1335,8 +1335,8 @@
         R(ctx, 15, 12, 3, 1, p.acc);
         R(ctx, 7, 13, 1, 1, p.accShade);
         R(ctx, 16, 13, 1, 1, p.accShade);
-        R(ctx, 9, 11, 1, 1, p.accShade);
-        R(ctx, 14, 11, 1, 1, p.accShade);
+        R(ctx, 9, 13, 1, 1, p.accShade);
+        R(ctx, 14, 13, 1, 1, p.accShade);
       } else if (M === 'tatouage') {
         R(ctx, 7, 10, 1, 2, p.accShade);
         R(ctx, 6, 11, 1, 1, p.accShade);
@@ -1358,7 +1358,7 @@
       } else if (M === 'peinture') {
         R(ctx, 12, 12, 4, 1, p.acc);
         R(ctx, 13, 13, 1, 1, p.accShade);
-        R(ctx, 15, 11, 1, 1, p.accShade);
+        R(ctx, 14, 13, 1, 1, p.accShade);
       } else if (M === 'tatouage') {
         R(ctx, 8, 10, 1, 2, p.accShade);
         R(ctx, 9, 12, 2, 1, p.accShade);
@@ -1569,7 +1569,7 @@
       R(ctx, 18, 11, 1, 1, skinS);
       R(ctx, 6, 10, 1, 1, skinL);
       R(ctx, 17, 10, 1, 1, skinL);
-      R(ctx, 7, 4, 10, 12, skin);
+      R(ctx, 7, 4, 10, 11, skin);
       R(ctx, 8, 4, 8, 1, skinL);
       R(ctx, 9, 5, 5, 1, skinL);
       R(ctx, 7, 6, 1, 8, skinS);
@@ -1581,28 +1581,20 @@
       R(ctx, 14, 12, 2, 1, U.shade(skin, 8));
       R(ctx, 7, 12, 1, 1, U.shade(skin, 10));
       R(ctx, 16, 12, 1, 1, U.shade(skin, 10));
-      // Sourcils, yeux, nez, bouche
-      R(ctx, 8, 9, 3, 1, p.hairShade);
-      R(ctx, 13, 9, 3, 1, p.hairShade);
-      R(ctx, 9, 8, 1, 1, p.hairShade);
-      R(ctx, 14, 8, 1, 1, p.hairShade);
-      R(ctx, 8, 10, 3, 2, '#f4eee2');
-      R(ctx, 8, 10, 2, 2, eye);
-      R(ctx, 8, 10, 1, 1, p.eyeGlow || '#fff6da');
-      R(ctx, 9, 11, 1, 1, '#241c2c');
-      R(ctx, 13, 10, 3, 2, '#f4eee2');
-      R(ctx, 14, 10, 2, 2, eye);
-      R(ctx, 14, 10, 1, 1, p.eyeGlow || '#fff6da');
-      R(ctx, 15, 11, 1, 1, '#241c2c');
-      R(ctx, 11, 11, 2, 2, skinS);
-      R(ctx, 11, 11, 1, 1, skinL);
-      R(ctx, 12, 13, 1, 1, U.shade(skinS, -10));
-      R(ctx, 10, 13, 1, 1, skinS);
-      R(ctx, 13, 13, 1, 1, skinS);
-      R(ctx, 10, 14, 4, 1, U.shade(skinS, -12));
+      // Sourcils fins, petits yeux, nez discret, bouche
+      R(ctx, 9, 9, 2, 1, p.hairShade);
+      R(ctx, 13, 9, 2, 1, p.hairShade);
+      R(ctx, 9, 10, 2, 2, eye);
+      R(ctx, 9, 10, 1, 1, p.eyeGlow || '#fff6da');
+      R(ctx, 10, 11, 1, 1, '#241c2c');
+      R(ctx, 13, 10, 2, 2, eye);
+      R(ctx, 13, 10, 1, 1, p.eyeGlow || '#fff6da');
+      R(ctx, 14, 11, 1, 1, '#241c2c');
+      R(ctx, 11, 12, 1, 1, U.shade(skin, 8));
+      R(ctx, 12, 12, 1, 1, skinS);
       R(ctx, 11, 14, 2, 1, '#b5766a');
-      R(ctx, 9, 14, 1, 1, skinS);
-      R(ctx, 14, 14, 1, 1, skinS);
+      R(ctx, 10, 14, 1, 1, U.shade(skinS, -6));
+      R(ctx, 13, 14, 1, 1, U.shade(skinS, -6));
       drawMarks(ctx, dir, p);
       drawBeard(ctx, dir, p);
       drawHairFront(ctx, dir, p, frame);
@@ -1657,27 +1649,23 @@
       R(ctx, ptx + ptw, 24 + armR, 2, 1, foreArmS);
       // Tête de profil
       R(ctx, 6, 4, 11, 12, skin);
-      R(ctx, 17, 10, 2, 3, skin);
-      R(ctx, 18, 10, 1, 3, skin);
+      R(ctx, 17, 10, 1, 3, skin);
       R(ctx, 10, 10, 2, 3, skin);
       R(ctx, 10, 11, 1, 1, skinS);
       R(ctx, 11, 10, 1, 1, skinL);
       R(ctx, 7, 4, 4, 1, skinL);
       R(ctx, 12, 6, 4, 1, skinL);
       R(ctx, 6, 6, 1, 8, skinS);
-      R(ctx, 8, 15, 6, 1, skinS);
+      R(ctx, 8, 15, 9, 1, skinS);
       R(ctx, 6, 14, 2, 1, skinS);
-      R(ctx, 15, 15, 3, 1, skinS);
-      R(ctx, 17, 11, 1, 1, skinL);
-      R(ctx, 18, 12, 1, 1, skinS);
-      R(ctx, 17, 13, 1, 1, skinS);
-      R(ctx, 14, 10, 2, 2, '#f4eee2');
-      R(ctx, 15, 10, 1, 2, eye);
-      R(ctx, 15, 10, 1, 1, p.eyeGlow || '#fff6da');
+      R(ctx, 17, 10, 1, 1, skinL);
+      R(ctx, 17, 12, 1, 1, skinS);
+      // Œil discret, sourcil fin, bouche
+      R(ctx, 14, 10, 2, 2, eye);
+      R(ctx, 14, 10, 1, 1, p.eyeGlow || '#fff6da');
       R(ctx, 15, 11, 1, 1, '#241c2c');
-      R(ctx, 13, 9, 3, 1, p.hairShade);
-      R(ctx, 16, 13, 2, 1, '#b5766a');
-      R(ctx, 15, 13, 1, 1, U.shade(skinS, -10));
+      R(ctx, 14, 9, 2, 1, p.hairShade);
+      R(ctx, 16, 13, 1, 1, '#b5766a');
       R(ctx, 15, 14, 2, 1, skinS);
       drawMarks(ctx, dir, p);
       drawBeard(ctx, dir, p);

@@ -33,7 +33,7 @@ Le jeu fonctionne hors ligne une fois la page chargée. La sauvegarde est stock�
 - Faune procédurale propre à chaque biome : oiseaux, papillons, écureuils, lapins, renards, lézards, grenouilles, lucioles et libellules, qui fuient le joueur sans jamais engager le combat.
 - Flore variée : fleurs par biome, hautes herbes, buissons à baies, rondins, nénuphars, galets, champignons lumineux et bouleaux.
 - 3 classes, 6 origines et un éditeur de personnage complet : 14 teints, 15 coiffures, 21 couleurs de cheveux, 12 iris, 5 barbes, 4 marques, 3 silhouettes, 4 tenues, 16 accessoires et 8 auras persistantes, avec aperçu animé et nom aléatoire.
-- Héros et PNJ redessinés en 24 × 32 dans un style proche de Stardew Valley : silhouettes fines, épaules arrondies, manches retroussées, avant-bras visibles, jambes longues et bottes, coiffures adoucies — toujours 100 % procédural.
+- Héros et PNJ redessinés en 24 × 32 dans un style proche de Stardew Valley : silhouettes fines, épaules arrondies, manches retroussées, avant-bras visibles, jambes longues et bottes, coiffures adoucies et visages affinés (petits yeux, nez discret, mâchoire arrondie) — toujours 100 % procédural.
 - Monstres nivelés, élites, mini-boss et 6 Gardiens de biome, boss final Nyx.
 - 8 quêtes principales et 16 quêtes annexes, journal de quêtes sur `L`.
 - Matériaux de monstre, amélioration à la forge, vendeurs spécialisés, sanctuaires, sauvegarde locale.
