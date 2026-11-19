@@ -32,7 +32,7 @@ Le jeu fonctionne hors ligne une fois la page chargée. La sauvegarde est stock�
 - 7 maisons entièrement meublées : un intérieur unique par maison, avec 12 à 15 meubles, éclairage d'ambiance et objets à examiner.
 - Faune procédurale propre à chaque biome : oiseaux, papillons, écureuils, lapins, renards, lézards, grenouilles, lucioles et libellules, qui fuient le joueur sans jamais engager le combat.
 - Flore variée : fleurs par biome, hautes herbes, buissons à baies, rondins, nénuphars, galets, champignons lumineux et bouleaux.
-- 3 classes, éditeur de personnage, origines, équipement sur 5 slots.
+- 3 classes, 6 origines et un éditeur de personnage complet : 14 teints, 15 coiffures, 21 couleurs de cheveux, 12 iris, 5 barbes, 4 marques, 3 silhouettes, 4 tenues, 16 accessoires et 8 auras persistantes, avec aperçu animé et nom aléatoire.
 - Monstres nivelés, élites, mini-boss et 6 Gardiens de biome, boss final Nyx.
 - 8 quêtes principales et 16 quêtes annexes, journal de quêtes sur `L`.
 - Matériaux de monstre, amélioration à la forge, vendeurs spécialisés, sanctuaires, sauvegarde locale.

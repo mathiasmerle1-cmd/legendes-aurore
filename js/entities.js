@@ -103,7 +103,8 @@
     xpToNext() { return D.LEVEL_XP(this.level); }
 
     gainXp(amount, game) {
-      this.xp += Math.max(1, Math.round(amount));
+      const originBonus = 1 + ((this.origin && this.origin.xp) || 0);
+      this.xp += Math.max(1, Math.round(amount * originBonus));
       let levels = 0;
       while (this.xp >= this.xpToNext() && this.level < 40) {
         this.xp -= this.xpToNext();
@@ -350,6 +351,36 @@
       const frames = this.sheet.frames[this.facing] || this.sheet.frames[0];
       const img = frames[this.frame % frames.length] || frames[0];
       const px = this.x - camX, py = this.y - camY;
+      // Aura persistante choisie dans l'éditeur : lueur au sol et particules.
+      const auraDef = D.AURAS[this.look.aura] || D.AURAS[0];
+      if (auraDef && auraDef.color) {
+        const pulse = 0.7 + Math.sin(time * 2.2) * 0.3;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const grad = ctx.createRadialGradient(px, py - 8, 2, px, py - 8, 23 + pulse * 3);
+        grad.addColorStop(0, U.rgba(auraDef.color, 0.2));
+        grad.addColorStop(0.55, U.rgba(auraDef.color, 0.09));
+        grad.addColorStop(1, U.rgba(auraDef.color, 0));
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.ellipse(px, py - 8, 21 + pulse * 2, 24 + pulse * 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 0.35 + pulse * 0.25;
+        ctx.strokeStyle = auraDef.color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(px, py - 1, 12 + pulse * 2, 5 + pulse, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        for (let i = 0; i < 3; i++) {
+          const a = time * 1.1 + i * 2.1;
+          const rx = px + Math.cos(a) * (11 + Math.sin(time * 1.7 + i) * 3);
+          const ry = py - 10 + Math.sin(a * 1.4) * (13 + Math.cos(time + i) * 2);
+          ctx.globalAlpha = 0.32 + Math.sin(time * 3 + i * 1.7) * 0.18;
+          ctx.fillRect(Math.round(rx), Math.round(ry), 2, 2);
+        }
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
       // ombre douce et pixelisée
       Art.drawShadow(ctx, px, py - 1, 19, 7, 0.95);
 
@@ -391,7 +422,7 @@
 
     serialize() {
       return {
-        name: this.name, classId: this.classId, look: this.look,
+        name: this.name, classId: this.classId, originId: this.originId, look: this.look,
         level: this.level, xp: this.xp, hp: this.hp, gold: this.gold,
         equipment: this.equipment, bag: this.bag, potions: this.potions,
         materials: this.materials, stats: this.stats,
@@ -403,6 +434,7 @@
     static deserialize(data, spawn) {
       const p = new Player({
         classId: data.classId, name: data.name, look: data.look,
+        origin: data.originId || 'aurore',
         x: data.x || spawn.x, y: data.y || spawn.y
       });
       p.level = data.level || 1;

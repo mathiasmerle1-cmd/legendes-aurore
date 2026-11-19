@@ -6,7 +6,7 @@
   const D = {};
 
   D.TITLE = "LES LÉGENDES D'AURORE";
-  D.VERSION = '1.4.0';
+  D.VERSION = '1.5.0';
   D.SAVE_KEY = 'legendes_aurore_save_v1';
   /* La carte de référence fait 240 × 240. Le monde final vaut 480 × 480. */
   D.MAP_SCALE = 2;
@@ -50,7 +50,11 @@
     { name: 'Ivoire', base: '#f7e2c8', shade: '#dbbd9d', light: '#fff5e6' },
     { name: 'Cuivre', base: '#b96f4e', shade: '#945236', light: '#d68f6a' },
     { name: 'Olive', base: '#b08b5e', shade: '#876843', light: '#c9a87b' },
-    { name: 'Cendre', base: '#8d7466', shade: '#675348', light: '#ad9484' }
+    { name: 'Cendre', base: '#8d7466', shade: '#675348', light: '#ad9484' },
+    { name: 'Rosé', base: '#efc1a6', shade: '#cd977c', light: '#ffdcc6' },
+    { name: 'Bronze', base: '#b57a52', shade: '#8f5a38', light: '#d19a70' },
+    { name: 'Noyer', base: '#7d5138', shade: '#5c3826', light: '#9a6a4c' },
+    { name: 'Ardoise', base: '#7b6458', shade: '#58463d', light: '#9c8375' }
   ];
 
   D.HAIRS = [
@@ -63,7 +67,12 @@
     { id: 'queue', name: 'Queue' },
     { id: 'mohawk', name: 'Mohawk' },
     { id: 'afro', name: 'Afro' },
-    { id: 'braids', name: 'Nattes' }
+    { id: 'braids', name: 'Nattes' },
+    { id: 'carre', name: 'Carré' },
+    { id: 'couettes', name: 'Couettes' },
+    { id: 'boucles', name: 'Boucles' },
+    { id: 'rideau', name: 'Rideau' },
+    { id: 'topknot', name: 'Chignon haut' }
   ];
 
   D.HAIR_COLORS = [
@@ -81,7 +90,13 @@
     { name: 'Cuivre', base: '#b05a34', shade: '#813d22' },
     { name: 'Océan', base: '#3f7f9e', shade: '#2a5d78' },
     { name: 'Corbeau', base: '#1c1c26', shade: '#0e0e16' },
-    { name: 'Cerise', base: '#9f3350', shade: '#76223a' }
+    { name: 'Cerise', base: '#9f3350', shade: '#76223a' },
+    { name: 'Abricot', base: '#d98c5f', shade: '#b06b44' },
+    { name: 'Argent', base: '#b9c0c9', shade: '#8b939e' },
+    { name: 'Turquoise', base: '#4f9a9a', shade: '#347272' },
+    { name: 'Prune', base: '#6b3f6e', shade: '#4b2a4e' },
+    { name: 'Sable', base: '#d3b98a', shade: '#a98f63' },
+    { name: 'Cendre', base: '#7b7480', shade: '#57515c' }
   ];
 
   D.EYE_COLORS = [
@@ -92,7 +107,11 @@
     { name: 'Gris', base: '#56616b', glow: '#a9b6c0' },
     { name: 'Violet', base: '#6f4a97', glow: '#bd8be8' },
     { name: 'Rubis', base: '#8d2f3c', glow: '#e87882' },
-    { name: 'Nuit', base: '#1d1b2a', glow: '#4f496d' }
+    { name: 'Nuit', base: '#1d1b2a', glow: '#4f496d' },
+    { name: 'Aigue-marine', base: '#2f8f8f', glow: '#7fe0dc' },
+    { name: 'Miel', base: '#a07a2f', glow: '#e2bf6a' },
+    { name: 'Rose', base: '#a24f74', glow: '#e890b4' },
+    { name: 'Argent', base: '#7f8fa0', glow: '#d2e2f0' }
   ];
 
   D.SHIRT_COLORS = [
@@ -107,7 +126,13 @@
     { name: 'Sable', base: '#c9b382', shade: '#a08c61' },
     { name: 'Céladon', base: '#87ad8b', shade: '#638a6a' },
     { name: 'Indigo', base: '#4b4e96', shade: '#34366c' },
-    { name: 'Ivoire', base: '#ded6bf', shade: '#b3aa90' }
+    { name: 'Ivoire', base: '#ded6bf', shade: '#b3aa90' },
+    { name: 'Moutarde', base: '#c2a13f', shade: '#947a2b' },
+    { name: 'Turquoise', base: '#3f9a9a', shade: '#2c7373' },
+    { name: 'Bordeaux', base: '#7d3548', shade: '#5b2534' },
+    { name: 'Lavande', base: '#8f7fc0', shade: '#6a5c96' },
+    { name: 'Olive', base: '#7d8a4a', shade: '#5c6735' },
+    { name: 'Rouille', base: '#b25f3c', shade: '#85452b' }
   ];
 
   D.PANTS_COLORS = [
@@ -120,7 +145,11 @@
     { name: 'Sable', base: '#b9a077', shade: '#8e7854' },
     { name: 'Forêt', base: '#3d5e45', shade: '#2a4330' },
     { name: 'Prune', base: '#5c3f66', shade: '#422c4b' },
-    { name: 'Rouille', base: '#7d4a32', shade: '#5b3222' }
+    { name: 'Rouille', base: '#7d4a32', shade: '#5b3222' },
+    { name: 'Anthracite', base: '#3f4148', shade: '#2b2d33' },
+    { name: 'Moutarde', base: '#a8893f', shade: '#7d642c' },
+    { name: 'Turquoise', base: '#3c6f74', shade: '#2a5155' },
+    { name: 'Bordeaux', base: '#6d3542', shade: '#4f2530' }
   ];
 
   D.ACCESSORIES = [
@@ -134,7 +163,12 @@
     { id: 'couronne', name: 'Couronne' },
     { id: 'masque', name: 'Masque' },
     { id: 'ailes', name: 'Ailes' },
-    { id: 'halo', name: 'Halo' }
+    { id: 'halo', name: 'Halo' },
+    { id: 'beret', name: 'Béret' },
+    { id: 'plume', name: 'Plume' },
+    { id: 'collier', name: 'Collier' },
+    { id: 'sacoche', name: 'Sacoche' },
+    { id: 'carquois', name: 'Carquois' }
   ];
 
   D.ACCESSORY_COLORS = [
@@ -144,7 +178,11 @@
     { name: 'Rubis', base: '#c65a59', shade: '#923b3d' },
     { name: 'Prune', base: '#9a68b8', shade: '#6e4688' },
     { name: 'Neige', base: '#e7e0d2', shade: '#b9b0a0' },
-    { name: 'Nuit', base: '#3f3b58', shade: '#27243a' }
+    { name: 'Nuit', base: '#3f3b58', shade: '#27243a' },
+    { name: 'Ambre', base: '#d99a45', shade: '#a8712b' },
+    { name: 'Aigue-marine', base: '#5fc4c0', shade: '#3d8f8c' },
+    { name: 'Ivoire', base: '#e9e2cf', shade: '#bdb49e' },
+    { name: 'Ardoise', base: '#5f6a74', shade: '#414a52' }
   ];
 
   D.AURAS = [
@@ -153,7 +191,39 @@
     { id: 'sylve', name: 'Sylve', color: '#8ef0a8' },
     { id: 'braise', name: 'Braise', color: '#ff9a5e' },
     { id: 'givre', name: 'Givre', color: '#9fe8ff' },
-    { id: 'ombre', name: 'Ombre', color: '#c891ff' }
+    { id: 'ombre', name: 'Ombre', color: '#c891ff' },
+    { id: 'orage', name: 'Orage', color: '#a8d8ff' },
+    { id: 'rose', name: 'Rose', color: '#ff9ecf' }
+  ];
+
+  D.BUILDS = [
+    { id: 'fine', name: 'Fine' },
+    { id: 'moyenne', name: 'Moyenne' },
+    { id: 'robuste', name: 'Robuste' }
+  ];
+
+  D.BEARDS = [
+    { id: 'none', name: 'Aucune' },
+    { id: 'moustache', name: 'Moustache' },
+    { id: 'bouc', name: 'Bouc' },
+    { id: 'courte', name: 'Barbe courte' },
+    { id: 'longue', name: 'Barbe longue' },
+    { id: 'favoris', name: 'Favoris' }
+  ];
+
+  D.MARKS = [
+    { id: 'none', name: 'Aucune' },
+    { id: 'taches', name: 'Taches de rousseur' },
+    { id: 'cicatrice', name: 'Cicatrice' },
+    { id: 'peinture', name: 'Peinture de guerre' },
+    { id: 'tatouage', name: 'Tatouage' }
+  ];
+
+  D.OUTFITS = [
+    { id: 'simple', name: 'Simple' },
+    { id: 'longue', name: 'Tunique longue' },
+    { id: 'tablier', name: 'Tablier' },
+    { id: 'cuirasse', name: 'Cuirasse' }
   ];
 
   D.ORIGINS = [
@@ -167,8 +237,15 @@
 
   D.DEFAULT_LOOK = {
     skin: 1, hair: 0, hairColor: 1, eye: 0, shirt: 0, pants: 0,
-    accessory: 0, accessoryColor: 0, aura: 0
+    accessory: 0, accessoryColor: 0, aura: 0,
+    build: 1, beard: 0, marks: 0, outfit: 0
   };
+
+  D.HERO_NAMES = [
+    'Aurore', 'Elian', 'Maëlle', 'Sacha', 'Nora', 'Lina', 'Elias', 'Mira',
+    'Noé', 'Alix', 'Rune', 'Yuna', 'Cael', 'Iris', 'Tao', 'Brune',
+    'Léon', 'Nell', 'Milo', 'Aya', 'Soline', 'Evan', 'Nael', 'Rose'
+  ];
 
   /* ------------------------------------------------------------
      Zones et biomes

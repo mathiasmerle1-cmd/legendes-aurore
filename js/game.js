@@ -987,6 +987,7 @@
       this.player = new Entities.Player({
         classId: editor.classId,
         name: editor.name,
+        origin: editor.originId,
         look: editor.look,
         x: spawn.x,
         y: spawn.y

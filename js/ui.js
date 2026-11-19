@@ -235,7 +235,7 @@
           <button class="pixel-btn ghost" id="btn-help">COMMANDES</button>
         </div>
         <div class="save-summary" id="save-summary"></div>
-        <div class="title-note">v1.4 · faune, flore et maisons habitées</div>
+        <div class="title-note">v1.5 · héros sur mesure</div>
       </div>
       <div class="title-badge">Cliquez pour activer le son</div>
     `;
@@ -268,10 +268,36 @@
   /* ============================================================
      Éditeur de personnage
      ============================================================ */
+  const EDITOR_TABS = [
+    { id: 'classe', label: 'CLASSE' },
+    { id: 'corps', label: 'CORPS' },
+    { id: 'visage', label: 'VISAGE' },
+    { id: 'cheveux', label: 'CHEVEUX' },
+    { id: 'tenue', label: 'TENUE' },
+    { id: 'accessoires', label: 'ACCESS.' },
+    { id: 'aura', label: 'AURA' },
+    { id: 'origine', label: 'ORIGINE' }
+  ];
+
+  function originBonusText(o) {
+    const parts = [];
+    if (o.hp) parts.push('PV +' + o.hp);
+    if (o.def) parts.push('DEF +' + o.def);
+    if (o.spd) parts.push('VIT +' + Math.round(o.spd * 100) + '%');
+    if (o.crit) parts.push('CRIT +' + Math.round(o.crit * 100) + '%');
+    if (o.stamina) parts.push('END +' + o.stamina);
+    if (o.xp) parts.push('XP +' + Math.round(o.xp * 100) + '%');
+    return parts.join(' · ');
+  }
+
   UI.buildEditor = function (s) {
     this.editorTime = 0;
+    this.editorTab = 'corps';
+    this.editorSpinIndex = 0;
+    this.editorAutoSpin = true;
     this.editorState = {
       classId: 'epeiste',
+      originId: 'aurore',
       look: Object.assign({}, D.DEFAULT_LOOK),
       name: 'Aurore'
     };
@@ -283,33 +309,37 @@
             <div class="eyebrow">CRÉATION DE PERSONNAGE</div>
             <h2>FAÇONNEZ VOTRE HÉROS</h2>
           </div>
-          <div class="editor-step">ÉTAPE UNIQUE</div>
+          <div class="editor-head-actions">
+            <div class="editor-step">APERÇU ANIMÉ</div>
+            <button class="quick-btn" id="ed-random">HASARD</button>
+            <button class="quick-btn" id="ed-default">DÉFAUT</button>
+          </div>
         </div>
         <div class="editor-body">
           <div class="editor-left">
             <div class="preview-frame">
               <div class="preview-checker"></div>
-              <canvas id="ed-preview" width="150" height="170"></canvas>
+              <canvas id="ed-preview" width="160" height="184"></canvas>
               <div class="preview-label" id="ed-preview-label">ÉPÉISTE</div>
+              <div class="preview-hint">CLIC · TOURNER</div>
             </div>
-            <label class="field-label" for="ed-name">NOM DU HÉROS</label>
-            <input id="ed-name" class="pixel-input" maxlength="12" value="Aurore" autocomplete="off" spellcheck="false">
-            <p class="editor-class-desc" id="ed-classdesc"></p>
+            <div class="name-row">
+              <div class="name-field">
+                <label class="field-label" for="ed-name">NOM</label>
+                <input id="ed-name" class="pixel-input" maxlength="12" value="Aurore" autocomplete="off" spellcheck="false">
+              </div>
+              <button class="dice-btn" id="ed-dice" title="Nom aléatoire">DÉ</button>
+            </div>
           </div>
           <div class="editor-right">
-            <div class="ed-section">
-              <div class="ed-section-title"><span>CLASSE</span><small id="ed-class-note">Choisissez votre style de combat</small></div>
-              <div class="class-row" id="ed-classes"></div>
-            </div>
-            <div class="ed-section">
-              <div class="ed-section-title"><span>APPARENCE</span><small id="ed-look-note">Personnalisez votre aventurier</small></div>
-              <div class="look-grid" id="ed-looks"></div>
-            </div>
+            <div class="editor-summary" id="ed-summary"></div>
+            <div class="ed-tabs" id="ed-tabs"></div>
+            <div class="ed-tab-body" id="ed-tab-body"></div>
           </div>
         </div>
         <div class="editor-actions">
           <button class="pixel-btn ghost" id="ed-back">RETOUR</button>
-          <div class="editor-hint">Les choix sont esthétiques : seule la classe change vos statistiques.</div>
+          <div class="editor-hint">Classe et origine fixent les statistiques. Le reste est libre.</div>
           <button class="pixel-btn primary" id="ed-start">COMMENCER ▸</button>
         </div>
       </div>
@@ -325,8 +355,59 @@
       e.stopPropagation();
     });
 
-    this.renderEditorClasses(s);
-    this.renderEditorLooks(s);
+    this.editorPreview.addEventListener('click', () => {
+      window.AudioSys.sfx('click');
+      this.editorAutoSpin = false;
+      this.editorSpinIndex = ((this.editorSpinIndex || 0) + 1) % 4;
+    });
+
+    s.querySelector('#ed-dice').addEventListener('click', () => {
+      const names = D.HERO_NAMES || ['Aurore'];
+      let pick = names[Math.floor(Math.random() * names.length)];
+      if (names.length > 1 && pick === nameInput.value) pick = names[(names.indexOf(pick) + 1) % names.length];
+      nameInput.value = pick;
+      this.editorState.name = pick;
+      window.AudioSys.sfx('click');
+    });
+
+    s.querySelector('#ed-random').addEventListener('click', () => {
+      const rnd = arr => Math.floor(Math.random() * arr.length);
+      const look = this.editorState.look;
+      look.skin = rnd(D.SKINS);
+      look.hair = rnd(D.HAIRS);
+      look.hairColor = rnd(D.HAIR_COLORS);
+      look.eye = rnd(D.EYE_COLORS);
+      look.shirt = rnd(D.SHIRT_COLORS);
+      look.pants = rnd(D.PANTS_COLORS);
+      look.build = rnd(D.BUILDS);
+      look.beard = rnd(D.BEARDS);
+      look.marks = rnd(D.MARKS);
+      look.outfit = rnd(D.OUTFITS);
+      look.accessory = rnd(D.ACCESSORIES);
+      look.accessoryColor = rnd(D.ACCESSORY_COLORS);
+      look.aura = rnd(D.AURAS);
+      this.editorState.originId = D.ORIGINS[rnd(D.ORIGINS)].id;
+      this.editorAutoSpin = false;
+      this.editorSpinIndex = 0;
+      window.AudioSys.sfx('click');
+      this.renderEditorTab(s);
+      this.updateEditorClassDesc(s);
+      this.drawEditorPreview();
+    });
+
+    s.querySelector('#ed-default').addEventListener('click', () => {
+      this.editorState.look = Object.assign({}, D.DEFAULT_LOOK);
+      this.editorState.originId = 'aurore';
+      this.editorAutoSpin = false;
+      this.editorSpinIndex = 0;
+      window.AudioSys.sfx('click');
+      this.renderEditorTab(s);
+      this.updateEditorClassDesc(s);
+      this.drawEditorPreview();
+    });
+
+    this.renderEditorTabs(s);
+    this.renderEditorTab(s);
     this.updateEditorClassDesc(s);
     this.drawEditorPreview();
 
@@ -344,8 +425,26 @@
     });
   };
 
+  UI.renderEditorTabs = function (s) {
+    const wrap = s.querySelector('#ed-tabs');
+    clearNode(wrap);
+    EDITOR_TABS.forEach(tab => {
+      const b = el('button', 'ed-tab' + (this.editorTab === tab.id ? ' selected' : ''), tab.label);
+      b.addEventListener('click', () => {
+        this.editorTab = tab.id;
+        this.editorAutoSpin = false;
+        this.editorSpinIndex = 0;
+        window.AudioSys.sfx('click');
+        this.renderEditorTabs(s);
+        this.renderEditorTab(s);
+      });
+      wrap.appendChild(b);
+    });
+  };
+
   UI.renderEditorClasses = function (s) {
     const row = s.querySelector('#ed-classes');
+    if (!row) return;
     clearNode(row);
     D.CLASSES.forEach(cls => {
       const card = el('button', 'class-card' + (this.editorState.classId === cls.id ? ' selected' : ''));
@@ -356,7 +455,7 @@
       card.addEventListener('click', () => {
         this.editorState.classId = cls.id;
         window.AudioSys.sfx('click');
-        this.renderEditorClasses(s);
+        this.renderEditorTab(s);
         this.updateEditorClassDesc(s);
         this.drawEditorPreview();
       });
@@ -365,16 +464,35 @@
   };
 
   UI.updateEditorClassDesc = function (s) {
-    const cls = D.CLASSES.find(c => c.id === this.editorState.classId) || D.CLASSES[0];
-    s.querySelector('#ed-preview-label').textContent = cls.name.toUpperCase();
-    s.querySelector('#ed-classdesc').innerHTML =
-      `<b style="color:${cls.color}">${cls.name}</b> — ${cls.desc}<br><span class="dim">PV ${cls.hp} · ATQ ${cls.atk} · DEF ${cls.def} · VIT ${cls.spd}</span>`;
+    const st = this.editorState;
+    const cls = D.CLASSES.find(c => c.id === st.classId) || D.CLASSES[0];
+    const origin = D.ORIGINS.find(o => o.id === st.originId) || D.ORIGINS[0];
+    const label = s.querySelector('#ed-preview-label');
+    if (label) label.textContent = cls.name.toUpperCase();
+    const summary = s.querySelector('#ed-summary');
+    if (summary) {
+      const hp = cls.hp + (origin.hp || 0);
+      const def = cls.def + (origin.def || 0);
+      const spd = Math.round(cls.spd * (1 + (origin.spd || 0)));
+      const crit = Math.round((cls.crit + (origin.crit || 0)) * 100);
+      summary.innerHTML =
+        `<div class="summary-top"><b style="color:${cls.color}">${cls.name}</b><i>·</i><b class="summary-origin">${origin.name}</b></div>` +
+        `<div class="summary-stats">PV <b>${hp}</b> · ATQ <b>${cls.atk}</b> · DEF <b>${def}</b> · VIT <b>${spd}</b> · CRIT <b>${crit}%</b></div>`;
+    }
   };
 
-  UI.renderEditorLooks = function (s) {
-    const wrap = s.querySelector('#ed-looks');
+  UI.renderEditorTab = function (s) {
+    const wrap = s.querySelector('#ed-tab-body');
+    if (!wrap) return;
     clearNode(wrap);
-
+    const look = this.editorState.look;
+    const rerender = () => {
+      this.editorAutoSpin = false;
+      this.editorSpinIndex = 0;
+      this.renderEditorTab(s);
+      this.updateEditorClassDesc(s);
+      this.drawEditorPreview();
+    };
     const addRow = (label, options, current, onPick, isColor) => {
       const row = el('div', 'look-row');
       const lab = el('div', 'look-label', label);
@@ -391,8 +509,7 @@
         b.addEventListener('click', () => {
           onPick(idx);
           window.AudioSys.sfx('click');
-          this.renderEditorLooks(s);
-          this.drawEditorPreview();
+          rerender();
         });
         opts.appendChild(b);
       });
@@ -400,42 +517,160 @@
       row.appendChild(opts);
       wrap.appendChild(row);
     };
+    const addNote = (text) => {
+      const p = el('p', 'ed-tab-note', text);
+      wrap.appendChild(p);
+    };
+    const addTitle = (title, note) => {
+      const t = el('div', 'ed-section-title');
+      t.innerHTML = `<span>${title}</span><small>${note || ''}</small>`;
+      wrap.appendChild(t);
+    };
 
-    const look = this.editorState.look;
-    addRow('PEAU', D.SKINS, look.skin, v => look.skin = v, true);
-    addRow('COIFFURE', D.HAIRS, look.hair, v => look.hair = v, false);
-    addRow('CHEVEUX', D.HAIR_COLORS, look.hairColor, v => look.hairColor = v, true);
-    addRow('HAUT', D.SHIRT_COLORS, look.shirt, v => look.shirt = v, true);
-    addRow('BAS', D.PANTS_COLORS, look.pants, v => look.pants = v, true);
+    if (this.editorTab === 'classe') {
+      addTitle('CLASSE', 'Trois styles de combat');
+      const row = el('div', 'class-row');
+      row.id = 'ed-classes';
+      wrap.appendChild(row);
+      this.renderEditorClasses(s);
+      const cls = D.CLASSES.find(c => c.id === this.editorState.classId) || D.CLASSES[0];
+      const desc = el('p', 'ed-tab-note');
+      desc.innerHTML = `<b style="color:${cls.color}">${cls.name}</b> — ${cls.desc}`;
+      wrap.appendChild(desc);
+      addNote('La classe fixe vos PV, votre attaque, votre défense et votre vitesse de base. L’origine s’y ajoute.');
+    } else if (this.editorTab === 'corps') {
+      addTitle('SILHOUETTE', 'Torse et carrure');
+      addRow('CORPULENCE', D.BUILDS, look.build, v => look.build = v, false);
+      addTitle('PEAU', D.SKINS.length + ' teintes');
+      addRow('TEINT', D.SKINS, look.skin, v => look.skin = v, true);
+      addNote('La silhouette élargit ou affine le torse et déplace les bras. La teinte de peau est libre.');
+    } else if (this.editorTab === 'visage') {
+      addTitle('YEUX', D.EYE_COLORS.length + ' iris');
+      addRow('IRIS', D.EYE_COLORS, look.eye, v => look.eye = v, true);
+      addTitle('BARBE', 'Six coupes');
+      addRow('BARBE', D.BEARDS, look.beard, v => look.beard = v, false);
+      addTitle('MARQUES', 'Visage marqué');
+      addRow('MARQUE', D.MARKS, look.marks, v => look.marks = v, false);
+      addNote('La peinture de guerre et le tatouage reprennent la couleur de votre accessoire.');
+    } else if (this.editorTab === 'cheveux') {
+      addTitle('COIFFURE', D.HAIRS.length + ' styles');
+      addRow('STYLE', D.HAIRS, look.hair, v => look.hair = v, false);
+      addTitle('COULEUR', D.HAIR_COLORS.length + ' teintes');
+      addRow('CHEVEUX', D.HAIR_COLORS, look.hairColor, v => look.hairColor = v, true);
+      addNote('Les coiffures longues, tressées ou en couettes bougent avec chaque pas.');
+    } else if (this.editorTab === 'tenue') {
+      addTitle('STYLE DE TENUE', 'Quatre coupes');
+      addRow('STYLE', D.OUTFITS, look.outfit, v => look.outfit = v, false);
+      addTitle('HAUT', D.SHIRT_COLORS.length + ' couleurs');
+      addRow('HAUT', D.SHIRT_COLORS, look.shirt, v => look.shirt = v, true);
+      addTitle('BAS', D.PANTS_COLORS.length + ' couleurs');
+      addRow('BAS', D.PANTS_COLORS, look.pants, v => look.pants = v, true);
+      addNote('Tunique longue, tablier ou cuirasse : chaque style change la silhouette du vêtement.');
+    } else if (this.editorTab === 'accessoires') {
+      addTitle('ACCESSOIRE', D.ACCESSORIES.length + ' pièces');
+      addRow('PIÈCE', D.ACCESSORIES, look.accessory, v => look.accessory = v, false);
+      addTitle('COULEUR', D.ACCESSORY_COLORS.length + ' teintes');
+      addRow('TEINTE', D.ACCESSORY_COLORS, look.accessoryColor, v => look.accessoryColor = v, true);
+      addNote('Béret, plume, collier, sacoche ou carquois : les pièces se dessinent devant ou derrière le héros.');
+    } else if (this.editorTab === 'aura') {
+      addTitle('AURA', 'Huit ambiances');
+      const opts = el('div', 'aura-options');
+      D.AURAS.forEach((aura, idx) => {
+        const b = el('button', 'look-chip aura-chip' + (idx === look.aura ? ' selected' : ''));
+        b.innerHTML = (aura.color
+          ? `<i style="background:${aura.color}"></i>`
+          : `<i class="aura-none"></i>`) + `<span>${aura.name}</span>`;
+        b.addEventListener('click', () => {
+          look.aura = idx;
+          window.AudioSys.sfx('click');
+          rerender();
+        });
+        opts.appendChild(b);
+      });
+      wrap.appendChild(opts);
+      addNote('L\'aura entoure le héros en jeu : lueur au sol et particules colorées.');
+    } else if (this.editorTab === 'origine') {
+      addTitle('ORIGINE', 'Votre passé');
+      const grid = el('div', 'origin-grid');
+      D.ORIGINS.forEach(o => {
+        const card = el('button', 'origin-card' + (this.editorState.originId === o.id ? ' selected' : ''));
+        card.innerHTML = `
+          <span class="origin-icon">${o.icon}</span>
+          <span class="origin-copy">
+            <b>${o.name}</b>
+            <small>${o.desc}</small>
+            <em>${originBonusText(o)}</em>
+          </span>
+        `;
+        card.addEventListener('click', () => {
+          this.editorState.originId = o.id;
+          window.AudioSys.sfx('click');
+          rerender();
+        });
+        grid.appendChild(card);
+      });
+      wrap.appendChild(grid);
+      addNote('L\'origine s\'ajoute aux statistiques de la classe et modifie votre façon de progresser.');
+    }
   };
 
   UI.drawEditorPreview = function () {
     if (!this.editorPreview || !this.editorState) return;
     const c = this.editorPreview;
     const ctx = c.getContext('2d');
-    ctx.clearRect(0, 0, c.width, c.height);
-    const sheet = Art.playerSheet(this.editorState.look);
+    const W = c.width, H = c.height;
+    ctx.clearRect(0, 0, W, H);
     const t = this.editorTime;
+    const look = this.editorState.look;
+    const sheet = Art.playerSheet(look);
+    // rotation douce de la vue, figée dès qu'on clique sur l'aperçu
+    const seq = [0, 2, 3, 1];
+    if (this.editorAutoSpin !== false) this.editorSpinIndex = Math.floor(t / 2.6) % 4;
+    const dir = seq[(this.editorSpinIndex || 0) % 4];
+    const frame = Math.floor(t * 4) % 3;
+    const img = sheet.frames[dir][frame] || sheet.frames[dir][0];
+    const cx = W / 2, feet = H - 26;
+    const bob = Math.sin(t * 2.4) * 1.4;
     // sol
     ctx.globalAlpha = 0.5;
     ctx.fillStyle = '#1b2638';
-    ctx.beginPath(); ctx.ellipse(75, 148, 40, 9, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx, feet + 4, 42, 9, 0, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
     ctx.fillStyle = '#2a3a52';
-    ctx.beginPath(); ctx.ellipse(75, 146, 30, 7, 0, 0, Math.PI * 2); ctx.fill();
-    // personnage 5x
-    const img = sheet.frames[0][0];
-    const s = 5;
-    const bob = Math.sin(t * 2.4) * 1.5;
+    ctx.beginPath(); ctx.ellipse(cx, feet + 2, 31, 7, 0, 0, Math.PI * 2); ctx.fill();
+    // aura
+    const auraDef = D.AURAS[look.aura] || D.AURAS[0];
+    if (auraDef.color) {
+      const pulse = 0.7 + Math.sin(t * 2.2) * 0.3;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const grad = ctx.createRadialGradient(cx, feet - 56, 4, cx, feet - 56, 68 + pulse * 8);
+      grad.addColorStop(0, U.rgba(auraDef.color, 0.24));
+      grad.addColorStop(0.5, U.rgba(auraDef.color, 0.11));
+      grad.addColorStop(1, U.rgba(auraDef.color, 0));
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(cx, feet - 56, 62 + pulse * 4, 74 + pulse * 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 0.4 + pulse * 0.25;
+      ctx.strokeStyle = auraDef.color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(cx, feet + 2, 30 + pulse * 3, 8 + pulse, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // personnage 6x
+    const s = 6;
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(img, Math.round(75 - img.width * s / 2), Math.round(142 - img.height * s + bob), img.width * s, img.height * s);
+    ctx.drawImage(img, Math.round(cx - img.width * s / 2), Math.round(feet - img.height * s + bob), img.width * s, img.height * s);
     // étincelles
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 7; i++) {
       const a = t * 0.7 + i * 1.05;
-      const x = 75 + Math.cos(a) * (44 + Math.sin(t + i) * 8);
-      const y = 100 + Math.sin(a * 1.3) * 40;
+      const x = cx + Math.cos(a) * (48 + Math.sin(t + i) * 8);
+      const y = 90 + Math.sin(a * 1.3) * 48;
       ctx.globalAlpha = 0.35 + Math.sin(t * 3 + i) * 0.25;
-      ctx.fillStyle = i % 2 ? '#ffe6a0' : '#9fdcff';
+      ctx.fillStyle = auraDef.color || (i % 2 ? '#ffe6a0' : '#9fdcff');
       ctx.fillRect(Math.round(x), Math.round(y), 2, 2);
     }
     ctx.globalAlpha = 1;

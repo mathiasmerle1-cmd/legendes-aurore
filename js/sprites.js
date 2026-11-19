@@ -265,11 +265,27 @@
     const accessoryDef = D.ACCESSORIES[look.accessory] || D.ACCESSORIES[0];
     const ac = D.ACCESSORY_COLORS[look.accessoryColor] || D.ACCESSORY_COLORS[0];
     const auraDef = D.AURAS[look.aura] || D.AURAS[0];
+    const buildIndex = typeof look.build === 'number'
+      ? Math.max(0, Math.min((D.BUILDS || []).length - 1, look.build)) : 1;
+    const buildDef = (D.BUILDS && D.BUILDS[buildIndex]) || { id: 'moyenne' };
+    const beardDef = (D.BEARDS && D.BEARDS[look.beard]) || { id: 'none' };
+    const marksDef = (D.MARKS && D.MARKS[look.marks]) || { id: 'none' };
+    // Les PNJ historiques utilisent robe/apron/armor directement. Les héros
+    // récents passent par un style de tenue unique et lisible dans l'éditeur.
+    let robe = !!look.robe, apron = !!look.apron, armor = !!look.armor;
+    if (typeof look.outfit === 'number' && D.OUTFITS) {
+      const outfitDef = D.OUTFITS[look.outfit] || D.OUTFITS[0];
+      robe = outfitDef.id === 'longue';
+      apron = outfitDef.id === 'tablier';
+      armor = outfitDef.id === 'cuirasse';
+    }
     return {
       skin, hairStyle: hairDef.id, hair: hc.base, hairShade: hc.shade,
       shirt: sc.base, shirtShade: sc.shade, shirtLight: U.shade(sc.base, 22),
       pants: pc.base, pantsShade: pc.shade,
-      robe: !!look.robe, apron: !!look.apron, armor: !!look.armor,
+      robe, apron, armor,
+      build: buildDef.id, buildIndex,
+      beard: beardDef.id, marks: marksDef.id,
       eye: ec.base, eyeGlow: ec.glow,
       accessory: accessoryDef.id, acc: ac.base, accShade: ac.shade,
       aura: auraDef.color, auraId: auraDef.id,
@@ -304,6 +320,31 @@
       else if (dir === 2) R(ctx, 9, 11, 3, 8, S);
     } else if (A === 'queue' || A === 'tresse') {
       R(ctx, 12, 5, 2, 7, p.hairShade);
+    } else if (A === 'sacoche') {
+      if (dir === 3) {
+        R(ctx, 11, 11, 5, 7, S); R(ctx, 12, 12, 4, 5, C);
+        R(ctx, 11, 10, 5, 2, S); R(ctx, 12, 10, 4, 1, U.shade(C, 18));
+        R(ctx, 8, 11, 1, 6, S); R(ctx, 9, 12, 1, 4, U.shade(S, 10));
+      } else if (dir === 2) {
+        R(ctx, 2, 12, 4, 6, S); R(ctx, 3, 13, 2, 4, C);
+        R(ctx, 2, 11, 4, 2, S); R(ctx, 3, 11, 2, 1, U.shade(C, 18));
+      } else {
+        R(ctx, 13, 13, 4, 6, S); R(ctx, 14, 14, 2, 4, C);
+        R(ctx, 13, 12, 4, 2, S);
+      }
+    } else if (A === 'carquois') {
+      if (dir === 2) {
+        R(ctx, 2, 6, 3, 9, S); R(ctx, 3, 7, 2, 7, C);
+        R(ctx, 2, 5, 3, 1, S);
+        R(ctx, 2, 4, 1, 2, S); R(ctx, 4, 4, 1, 2, S);
+        R(ctx, 2, 3, 1, 1, C); R(ctx, 4, 3, 1, 1, C);
+        R(ctx, 3, 14, 2, 1, p.accShade);
+      } else if (dir === 0) {
+        R(ctx, 13, 6, 2, 8, S); R(ctx, 14, 7, 1, 6, C);
+        R(ctx, 13, 5, 2, 1, S); R(ctx, 13, 13, 2, 1, p.accShade);
+        R(ctx, 13, 4, 1, 2, S); R(ctx, 15, 3, 1, 3, S);
+        R(ctx, 13, 3, 1, 1, C); R(ctx, 15, 2, 1, 1, C);
+      }
     }
   }
 
@@ -347,6 +388,59 @@
       }
     } else if (A === 'halo') {
       R(ctx, 5, 0, 8, 1, C); R(ctx, 4, 1, 1, 1, S); R(ctx, 13, 1, 1, 1, S);
+    } else if (A === 'beret') {
+      if (dir === 3) {
+        R(ctx, 4, 1, 10, 2, C); R(ctx, 5, 0, 8, 1, C); R(ctx, 4, 3, 10, 1, S);
+      } else if (dir === 2) {
+        R(ctx, 5, 1, 10, 2, C); R(ctx, 6, 0, 8, 1, C); R(ctx, 5, 3, 10, 1, S);
+        R(ctx, 14, 1, 1, 2, U.shade(C, 18));
+      } else {
+        R(ctx, 3, 1, 12, 2, C); R(ctx, 4, 0, 10, 1, C); R(ctx, 3, 3, 12, 1, S);
+        R(ctx, 12, 0, 2, 1, U.shade(C, 18));
+      }
+    } else if (A === 'plume') {
+      const px = dir === 2 ? 10 : 11;
+      R(ctx, px, 0, 1, 5, S);
+      R(ctx, px - 2, 0, 2, 1, C); R(ctx, px + 1, 0, 2, 1, C);
+      R(ctx, px - 1, 1, 1, 1, U.shade(C, 20)); R(ctx, px + 1, 1, 1, 1, C);
+      R(ctx, px - 1, 2, 1, 1, S); R(ctx, px + 1, 2, 1, 1, S);
+    } else if (A === 'collier') {
+      if (dir === 3) {
+        R(ctx, 7, 9, 4, 1, S);
+        R(ctx, 9, 10, 1, 2, C);
+      } else if (dir === 2) {
+        R(ctx, 7, 9, 4, 1, S); R(ctx, 10, 10, 1, 2, C); R(ctx, 10, 11, 1, 1, U.shade(C, 22));
+      } else {
+        R(ctx, 6, 9, 1, 1, S); R(ctx, 7, 10, 4, 1, S); R(ctx, 11, 9, 1, 1, S);
+        R(ctx, 8, 11, 2, 2, C); R(ctx, 9, 11, 1, 1, U.shade(C, 22));
+      }
+    } else if (A === 'sacoche') {
+      if (dir === 3) {
+        R(ctx, 8, 11, 1, 5, S); R(ctx, 9, 12, 1, 4, U.shade(S, 12));
+      } else if (dir === 2) {
+        R(ctx, 9, 11, 1, 6, S); R(ctx, 10, 12, 1, 4, U.shade(S, 12));
+      } else {
+        R(ctx, 6, 11, 1, 2, S); R(ctx, 7, 13, 1, 2, S); R(ctx, 8, 15, 1, 3, S);
+      }
+    } else if (A === 'carquois') {
+      if (dir === 3) {
+        // Carquois complet vu de dos : fût, flèches et sangle en travers du dos.
+        R(ctx, 10, 4, 4, 12, S); R(ctx, 11, 5, 2, 10, C);
+        R(ctx, 10, 3, 4, 1, U.shade(S, 12)); R(ctx, 11, 3, 1, 1, U.shade(C, 18));
+        R(ctx, 11, 1, 1, 2, p.accShade); R(ctx, 12, 0, 1, 2, p.accShade); R(ctx, 13, 1, 1, 2, p.accShade);
+        R(ctx, 12, 0, 1, 1, U.shade(C, 26)); R(ctx, 13, 0, 1, 1, U.shade(C, 26));
+        R(ctx, 11, 14, 2, 1, p.accShade);
+        R(ctx, 12, 12, 1, 1, p.gold);
+        R(ctx, 6, 11, 1, 2, S); R(ctx, 7, 13, 1, 2, S); R(ctx, 8, 15, 1, 2, S);
+      } else if (dir === 2) {
+        // Profil : la sangle passe sur le torse, le carquois reste derrière l'épaule.
+        R(ctx, 9, 11, 1, 2, S); R(ctx, 9, 13, 1, 2, S); R(ctx, 9, 15, 1, 1, S);
+        R(ctx, 9, 13, 1, 1, p.gold);
+      } else {
+        // Face : sangle de l'épaule gauche vers la hanche droite.
+        R(ctx, 12, 11, 1, 2, S); R(ctx, 11, 13, 1, 2, S); R(ctx, 10, 15, 1, 2, S);
+        R(ctx, 11, 14, 1, 1, p.gold);
+      }
     }
   }
 
@@ -388,12 +482,73 @@
         R(ctx, 3, 6, 2, 9, p.hair); R(ctx, 13, 6, 2, 9, p.hair);
       }
     } else if (p.hairStyle === 'afro') {
-      R(ctx, 2, 1, 14, 10, p.hair);
-      R(ctx, 3, 10, 12, 3, p.hairShade);
-      if (dir === 0) { R(ctx, 2, 4, 2, 6, p.hair); R(ctx, 14, 4, 2, 6, p.hair); }
+      if (dir === 3) {
+        R(ctx, 2, 1, 14, 10, p.hair);
+        R(ctx, 3, 10, 12, 3, p.hairShade);
+      } else if (dir === 2) {
+        R(ctx, 1, 2, 6, 8, p.hair);
+        R(ctx, 2, 9, 5, 2, p.hairShade);
+      } else {
+        R(ctx, 2, 2, 3, 6, p.hair); R(ctx, 13, 2, 3, 6, p.hair);
+      }
     } else if (p.hairStyle === 'mohawk') {
       if (dir === 3) R(ctx, 8, 0, 3, 8, p.hair);
       if (dir === 0) R(ctx, 8, 0, 2, 3, p.hair);
+    } else if (p.hairStyle === 'carre') {
+      if (dir === 3) {
+        R(ctx, 3, 3, 12, 8, p.hair); R(ctx, 4, 11, 10, 2, p.hairShade);
+        R(ctx, 4, 4, 4, 1, U.shade(p.hair, 22));
+      } else if (dir === 2) {
+        R(ctx, 3, 4, 3, 7, p.hair); R(ctx, 3, 10, 3, 2, p.hairShade);
+      } else {
+        R(ctx, 3, 4, 2, 6, p.hair); R(ctx, 13, 4, 2, 6, p.hair);
+      }
+    } else if (p.hairStyle === 'couettes') {
+      if (dir === 3) {
+        R(ctx, 1, 7, 3, 10, p.hair); R(ctx, 14, 7, 3, 10, p.hair);
+        R(ctx, 1, 15, 3, 1, p.gold); R(ctx, 14, 15, 3, 1, p.gold);
+        R(ctx, 1, 9, 1, 4, U.shade(p.hair, 20));
+      } else if (dir === 2) {
+        R(ctx, 1, 7, 3, 9, p.hair); R(ctx, 1, 15, 3, 1, p.gold);
+        R(ctx, 1, 9, 1, 3, U.shade(p.hair, 20));
+      } else {
+        R(ctx, 1, 5, 3, 8, p.hair); R(ctx, 14, 5, 3, 8, p.hair);
+        R(ctx, 1, 12, 3, 1, p.gold); R(ctx, 14, 12, 3, 1, p.gold);
+      }
+    } else if (p.hairStyle === 'boucles') {
+      if (dir === 3) {
+        R(ctx, 2, 2, 14, 9, p.hair); R(ctx, 1, 4, 1, 5, p.hair); R(ctx, 16, 4, 1, 5, p.hair);
+        R(ctx, 3, 10, 3, 3, p.hair); R(ctx, 7, 10, 4, 4, p.hair); R(ctx, 12, 10, 3, 3, p.hair);
+        R(ctx, 4, 3, 2, 1, U.shade(p.hair, 26)); R(ctx, 10, 2, 1, 1, U.shade(p.hair, 20));
+        R(ctx, 4, 12, 2, 1, p.hairShade); R(ctx, 12, 11, 2, 1, p.hairShade);
+      } else if (dir === 2) {
+        R(ctx, 2, 3, 4, 9, p.hair); R(ctx, 2, 11, 3, 3, p.hair);
+        R(ctx, 3, 4, 1, 3, U.shade(p.hair, 24));
+        R(ctx, 3, 12, 2, 1, p.hairShade);
+      } else {
+        R(ctx, 2, 4, 2, 6, p.hair); R(ctx, 14, 4, 2, 6, p.hair);
+        R(ctx, 2, 9, 2, 3, p.hair); R(ctx, 14, 9, 2, 3, p.hair);
+        R(ctx, 2, 11, 2, 1, p.hairShade); R(ctx, 14, 11, 2, 1, p.hairShade);
+      }
+    } else if (p.hairStyle === 'rideau') {
+      if (dir === 3) {
+        R(ctx, 3, 3, 12, 10, p.hair); R(ctx, 4, 12, 10, 2, p.hairShade);
+        R(ctx, 5, 3, 3, 1, U.shade(p.hair, 24));
+      } else if (dir === 2) {
+        R(ctx, 2, 4, 4, 10, p.hair); R(ctx, 2, 13, 3, 2, p.hairShade);
+      } else {
+        R(ctx, 2, 4, 2, 9, p.hair); R(ctx, 14, 4, 2, 9, p.hair);
+        R(ctx, 2, 12, 2, 2, p.hairShade); R(ctx, 14, 12, 2, 2, p.hairShade);
+      }
+    } else if (p.hairStyle === 'topknot') {
+      if (dir === 3) {
+        R(ctx, 7, 0, 4, 3, p.hair); R(ctx, 8, 0, 2, 1, U.shade(p.hair, 26));
+        R(ctx, 9, 2, 4, 2, p.hairShade);
+      } else if (dir === 2) {
+        R(ctx, 8, 0, 3, 3, p.hair); R(ctx, 8, 0, 1, 1, U.shade(p.hair, 26));
+      } else {
+        R(ctx, 7, 0, 4, 3, p.hair); R(ctx, 8, 0, 2, 1, U.shade(p.hair, 26));
+      }
     }
   }
 
@@ -433,6 +588,32 @@
       if (p.hairStyle === 'mohawk') {
         R(ctx, 8, 0, 3, 8, H); R(ctx, 8, 0, 1, 3, shine);
       }
+      if (p.hairStyle === 'carre') {
+        R(ctx, 3, 4, 2, 8, H); R(ctx, 13, 4, 2, 8, H);
+        R(ctx, 4, 10, 10, 2, H); R(ctx, 4, 11, 10, 1, HS);
+        R(ctx, 5, 3, 2, 1, shine);
+      }
+      if (p.hairStyle === 'couettes') {
+        R(ctx, 1, 5, 3, 9, H); R(ctx, 14, 5, 3, 9, H);
+        R(ctx, 1, 12, 3, 1, p.gold); R(ctx, 14, 12, 3, 1, p.gold);
+        R(ctx, 1, 6, 1, 4, shine); R(ctx, 14, 6, 1, 4, shine);
+      }
+      if (p.hairStyle === 'boucles') {
+        R(ctx, 2, 4, 2, 6, H); R(ctx, 14, 4, 2, 6, H);
+        R(ctx, 3, 9, 2, 3, H); R(ctx, 5, 9, 3, 4, H);
+        R(ctx, 9, 9, 3, 4, H); R(ctx, 12, 9, 3, 3, H);
+        R(ctx, 3, 11, 2, 1, HS); R(ctx, 9, 12, 3, 1, HS);
+      }
+      if (p.hairStyle === 'rideau') {
+        R(ctx, 2, 3, 2, 10, H); R(ctx, 14, 3, 2, 10, H);
+        R(ctx, 8, 2, 1, 3, HS);
+        R(ctx, 2, 11, 2, 2, HS); R(ctx, 14, 11, 2, 2, HS);
+      }
+      if (p.hairStyle === 'topknot') {
+        R(ctx, 4, 2, 1, 7, HS); R(ctx, 13, 2, 1, 7, HS);
+        R(ctx, 7, 0, 4, 3, H); R(ctx, 8, 0, 2, 1, shine);
+        R(ctx, 7, 2, 4, 1, p.gold);
+      }
       return;
     }
 
@@ -468,12 +649,42 @@
       } else if (p.hairStyle === 'mohawk') {
         R(ctx, 8, 0, 3, 6, H); R(ctx, 8, 0, 1, 3, shine); R(ctx, 5, 4, 1, 2, HS); R(ctx, 12, 4, 1, 2, HS);
       } else if (p.hairStyle === 'afro') {
-        R(ctx, 2, 1, 14, 7, H); R(ctx, 3, 7, 12, 2, HS);
-        R(ctx, 5, 1, 4, 1, shine); R(ctx, 2, 3, 2, 5, H); R(ctx, 14, 3, 2, 5, H);
+        R(ctx, 3, 1, 12, 3, H);
+        R(ctx, 2, 3, 3, 5, H); R(ctx, 13, 3, 3, 5, H);
+        R(ctx, 3, 8, 2, 2, H); R(ctx, 13, 8, 2, 2, H);
+        R(ctx, 5, 1, 4, 1, shine);
+        R(ctx, 4, 3, 1, 3, U.shade(H, 14)); R(ctx, 15, 4, 1, 2, HS);
       } else if (p.hairStyle === 'braids') {
         R(ctx, 4, 2, 10, 4, H); R(ctx, 4, 5, 2, 3, H); R(ctx, 12, 5, 2, 3, H);
         R(ctx, 3, 6, 2, 10, HS); R(ctx, 13, 6, 2, 10, HS);
         R(ctx, 3, 16, 2, 1, p.gold); R(ctx, 13, 16, 2, 1, p.gold);
+      } else if (p.hairStyle === 'carre') {
+        R(ctx, 4, 3, 2, 8, H); R(ctx, 12, 3, 2, 8, H);
+        R(ctx, 5, 4, 8, 2, H); R(ctx, 6, 4, 3, 1, shine);
+        R(ctx, 4, 10, 2, 1, HS); R(ctx, 12, 10, 2, 1, HS);
+      } else if (p.hairStyle === 'couettes') {
+        R(ctx, 1, 5, 3, 9, H); R(ctx, 14, 5, 3, 9, H);
+        R(ctx, 1, 6, 1, 4, shine); R(ctx, 14, 6, 1, 4, shine);
+        R(ctx, 1, 12, 3, 1, p.gold); R(ctx, 14, 12, 3, 1, p.gold);
+        R(ctx, 1, 13, 3, 2, HS); R(ctx, 14, 13, 3, 2, HS);
+        R(ctx, 5, 4, 3, 2, H); R(ctx, 10, 4, 3, 2, H);
+      } else if (p.hairStyle === 'boucles') {
+        R(ctx, 2, 4, 2, 6, H); R(ctx, 14, 4, 2, 6, H);
+        R(ctx, 3, 9, 2, 3, H); R(ctx, 13, 9, 2, 3, H);
+        R(ctx, 4, 4, 1, 2, shine); R(ctx, 13, 5, 1, 2, shine);
+        R(ctx, 3, 10, 2, 1, HS); R(ctx, 13, 10, 2, 1, HS);
+        R(ctx, 5, 4, 3, 2, H); R(ctx, 10, 4, 3, 2, H);
+      } else if (p.hairStyle === 'rideau') {
+        R(ctx, 4, 3, 2, 10, H); R(ctx, 12, 3, 2, 10, H);
+        R(ctx, 6, 4, 2, 1, H); R(ctx, 10, 4, 2, 1, H);
+        R(ctx, 8, 3, 2, 1, HS);
+        R(ctx, 4, 11, 2, 2, HS); R(ctx, 12, 11, 2, 2, HS);
+      } else if (p.hairStyle === 'topknot') {
+        R(ctx, 7, 0, 4, 3, H); R(ctx, 8, 0, 2, 1, shine);
+        R(ctx, 7, 2, 4, 1, p.gold);
+        R(ctx, 4, 3, 2, 5, H); R(ctx, 12, 3, 2, 5, H);
+        R(ctx, 6, 4, 2, 1, H); R(ctx, 10, 4, 2, 1, H);
+        R(ctx, 4, 7, 2, 1, HS); R(ctx, 12, 7, 2, 1, HS);
       } else {
         // rasé
         R(ctx, 5, 3, 8, 2, H); R(ctx, 4, 4, 1, 2, H); R(ctx, 13, 4, 1, 2, H);
@@ -508,11 +719,117 @@
     } else if (p.hairStyle === 'mohawk') {
       R(ctx, 8, 0, 3, 6, H); R(ctx, 8, 0, 1, 3, shine); R(ctx, 5, 4, 2, 2, HS); R(ctx, 11, 4, 2, 1, HS);
     } else if (p.hairStyle === 'afro') {
-      R(ctx, 3, 1, 12, 8, H); R(ctx, 3, 8, 11, 2, HS); R(ctx, 5, 1, 4, 1, shine);
+      R(ctx, 2, 2, 4, 6, H); R(ctx, 3, 8, 5, 2, H);
+      R(ctx, 5, 1, 8, 2, H); R(ctx, 4, 3, 1, 3, shine);
+      R(ctx, 3, 8, 2, 1, HS);
     } else if (p.hairStyle === 'braids') {
       R(ctx, 4, 2, 10, 4, H); R(ctx, 3, 6, 2, 10, H); R(ctx, 3, 16, 2, 1, p.gold); R(ctx, 4, 9, 1, 5, HS);
+    } else if (p.hairStyle === 'carre') {
+      R(ctx, 4, 3, 2, 8, H); R(ctx, 6, 4, 5, 2, H); R(ctx, 4, 10, 2, 1, HS);
+    } else if (p.hairStyle === 'couettes') {
+      R(ctx, 2, 5, 3, 9, H); R(ctx, 2, 12, 3, 1, p.gold); R(ctx, 2, 13, 3, 2, HS);
+      R(ctx, 6, 4, 4, 2, H); R(ctx, 2, 6, 1, 4, shine);
+    } else if (p.hairStyle === 'boucles') {
+      R(ctx, 3, 4, 3, 7, H); R(ctx, 6, 4, 5, 2, H);
+      R(ctx, 3, 10, 3, 2, H); R(ctx, 3, 11, 2, 1, HS);
+    } else if (p.hairStyle === 'rideau') {
+      R(ctx, 3, 3, 2, 10, H); R(ctx, 6, 4, 5, 2, H); R(ctx, 3, 11, 2, 2, HS);
+    } else if (p.hairStyle === 'topknot') {
+      R(ctx, 7, 0, 4, 3, H); R(ctx, 8, 0, 2, 1, shine); R(ctx, 7, 2, 4, 1, p.gold);
+      R(ctx, 4, 3, 2, 6, H); R(ctx, 6, 4, 4, 2, H); R(ctx, 4, 8, 2, 1, HS);
     } else {
       R(ctx, 5, 3, 8, 2, H); R(ctx, 4, 3, 1, 4, H);
+    }
+  }
+
+  function drawBeard(ctx, dir, p) {
+    const B = p.beard;
+    if (!B || B === 'none') return;
+    const H = p.hair, HS = p.hairShade, L = U.shade(H, 18);
+    if (dir === 0) {
+      if (B === 'moustache') {
+        R(ctx, 7, 7, 4, 1, H); R(ctx, 6, 8, 1, 1, HS); R(ctx, 11, 8, 1, 1, HS);
+      } else if (B === 'bouc') {
+        R(ctx, 7, 7, 4, 1, H); R(ctx, 8, 9, 2, 2, H); R(ctx, 8, 10, 2, 1, HS);
+      } else if (B === 'courte') {
+        R(ctx, 5, 7, 1, 3, H); R(ctx, 12, 7, 1, 3, H);
+        R(ctx, 6, 9, 6, 2, H); R(ctx, 7, 10, 4, 1, HS); R(ctx, 8, 9, 2, 1, L);
+      } else if (B === 'longue') {
+        R(ctx, 4, 6, 2, 5, H); R(ctx, 12, 6, 2, 5, H);
+        R(ctx, 7, 8, 4, 1, H);
+        R(ctx, 6, 9, 6, 3, H); R(ctx, 7, 11, 4, 3, H);
+        R(ctx, 8, 12, 2, 2, HS); R(ctx, 8, 9, 2, 1, L);
+      } else if (B === 'favoris') {
+        R(ctx, 4, 5, 1, 5, H); R(ctx, 13, 5, 1, 5, H);
+        R(ctx, 5, 8, 1, 2, HS); R(ctx, 12, 8, 1, 2, HS);
+      }
+    } else if (dir === 2) {
+      if (B === 'moustache') {
+        R(ctx, 9, 8, 3, 1, H);
+      } else if (B === 'bouc') {
+        R(ctx, 9, 8, 3, 1, H); R(ctx, 10, 10, 2, 2, H); R(ctx, 10, 11, 2, 1, HS);
+      } else if (B === 'courte') {
+        R(ctx, 6, 7, 1, 3, H); R(ctx, 9, 9, 4, 2, H); R(ctx, 10, 10, 3, 1, HS);
+      } else if (B === 'longue') {
+        R(ctx, 5, 6, 2, 6, H); R(ctx, 9, 8, 3, 1, H);
+        R(ctx, 9, 9, 4, 3, H); R(ctx, 10, 12, 3, 2, HS);
+      } else if (B === 'favoris') {
+        R(ctx, 5, 5, 1, 5, H); R(ctx, 6, 8, 1, 2, HS);
+      }
+    }
+  }
+
+  function drawMarks(ctx, dir, p) {
+    const M = p.marks;
+    if (!M || M === 'none') return;
+    if (dir === 0) {
+      if (M === 'taches') {
+        R(ctx, 6, 7, 1, 1, '#bf855f'); R(ctx, 7, 8, 1, 1, '#cf9570');
+        R(ctx, 11, 7, 1, 1, '#bf855f'); R(ctx, 10, 8, 1, 1, '#cf9570');
+      } else if (M === 'cicatrice') {
+        R(ctx, 6, 5, 1, 1, '#e0b09c'); R(ctx, 6, 6, 1, 2, '#c9877a'); R(ctx, 6, 8, 1, 1, '#e0b09c');
+      } else if (M === 'peinture') {
+        R(ctx, 6, 6, 2, 1, p.acc); R(ctx, 10, 6, 2, 1, p.acc);
+        R(ctx, 6, 8, 1, 1, p.accShade); R(ctx, 11, 8, 1, 1, p.accShade);
+      } else if (M === 'tatouage') {
+        R(ctx, 6, 7, 1, 2, p.accShade); R(ctx, 11, 6, 1, 1, p.accShade); R(ctx, 12, 7, 1, 1, p.accShade);
+      }
+    } else if (dir === 2) {
+      if (M === 'taches') {
+        R(ctx, 6, 8, 1, 1, '#bf855f'); R(ctx, 7, 7, 1, 1, '#cf9570'); R(ctx, 8, 8, 1, 1, '#bf855f');
+      } else if (M === 'cicatrice') {
+        R(ctx, 6, 5, 1, 1, '#e0b09c'); R(ctx, 6, 6, 1, 3, '#c9877a');
+      } else if (M === 'peinture') {
+        R(ctx, 6, 6, 3, 1, p.acc); R(ctx, 7, 8, 1, 1, p.accShade);
+      } else if (M === 'tatouage') {
+        R(ctx, 6, 7, 1, 2, p.accShade); R(ctx, 7, 8, 1, 1, p.accShade);
+      }
+    }
+  }
+
+  function drawOutfitOverlay(ctx, dir, p, tx, tw) {
+    const cloth = '#e8ddc1', clothS = '#cbbf9f';
+    if (p.apron) {
+      if (dir === 3) {
+        R(ctx, tx + 1, 14, Math.max(2, tw - 2), 4, cloth);
+        R(ctx, tx + 1, 17, Math.max(2, tw - 2), 1, clothS);
+        R(ctx, tx + 2, 14, 1, 2, U.shade(cloth, 12));
+      } else if (dir === 0) {
+        R(ctx, tx + 1, 14, Math.max(2, tw - 2), 4, cloth);
+        R(ctx, tx + 1, 17, Math.max(2, tw - 2), 1, clothS);
+        R(ctx, tx + 2, 14, 1, 1, clothS);
+        R(ctx, tx + tw - 3, 15, 1, 2, U.shade(cloth, 12));
+      } else {
+        R(ctx, Math.max(4, tx + 1), 14, Math.max(3, tw - 2), 4, cloth);
+        R(ctx, Math.max(4, tx + 1), 17, Math.max(3, tw - 2), 1, clothS);
+      }
+    }
+    if (p.armor) {
+      R(ctx, tx - 1, 11, tw + 2, 4, '#9aa4ac');
+      R(ctx, tx, 12, tw, 1, '#c6d0d6');
+      R(ctx, tx - 2, 11, 2, 2, '#6d7880'); R(ctx, tx + tw, 11, 2, 2, '#6d7880');
+      R(ctx, tx, 14, tw, 1, '#77828a');
+      R(ctx, tx + (tw >> 1) - 1, 13, 2, 2, p.gold);
     }
   }
 
@@ -522,6 +839,11 @@
     const pants = p.pants, pantsS = p.pantsShade;
     const eye = p.eye || p.eyes;
     const walk = frame === 1 ? 1 : frame === 2 ? -1 : 0;
+    // Silhouette : torse plus étroit ou plus large, bras décalés d'autant.
+    const broad = p.buildIndex === 2 ? 1 : 0;
+    const slim = p.buildIndex === 0 ? 1 : 0;
+    const tx = 5 - broad + slim, tw = 8 + broad * 2 - slim * 2;
+    const shoeLight = U.shade(p.shoes, 26);
 
     drawAccessoryBehind(ctx, dir, p);
     drawHairBehind(ctx, dir, p, frame);
@@ -532,16 +854,27 @@
       R(ctx, 5, 18, 3, lh1, pants); R(ctx, 10, 18, 3, lh2, pants);
       R(ctx, 5, 18 + lh1 - 1, 3, 2, p.shoes); R(ctx, 10, 18 + lh2 - 1, 3, 2, p.shoes);
       R(ctx, 5, 18, 1, 3, pantsS); R(ctx, 10, 18, 1, 3, pantsS);
+      R(ctx, 6, 19, 1, 1, shoeLight); R(ctx, 11, 19, 1, 1, shoeLight);
+      if (p.robe) {
+        R(ctx, tx - 1, 17, tw + 2, 4, shirtS);
+        R(ctx, tx - 1, 20, tw + 2, 1, U.shade(shirtS, -16));
+        R(ctx, 5, 20, 3, 2, p.shoes); R(ctx, 10, 20, 3, 2, p.shoes);
+        R(ctx, 6, 20, 1, 1, shoeLight); R(ctx, 11, 20, 1, 1, shoeLight);
+      }
       // Torse
-      R(ctx, 5, 11, 8, 7, shirt);
-      R(ctx, 4, 12, 1, 4, shirtS); R(ctx, 13, 12, 1, 4, shirtS);
-      R(ctx, 5, 11, 8, 1, shirtL);
-      R(ctx, 11, 12, 2, 6, shirtS);
-      R(ctx, 5, 17, 8, 1, p.belt);
+      R(ctx, tx, 11, tw, 7, shirt);
+      R(ctx, tx - 1, 12, 1, 4, shirtS); R(ctx, tx + tw, 12, 1, 4, shirtS);
+      R(ctx, tx, 11, tw, 1, shirtL);
+      R(ctx, tx + tw - 2, 12, 2, 6, shirtS);
+      R(ctx, tx, 16, tw, 1, p.robe ? shirtS : U.shade(shirt, -12));
+      R(ctx, tx, 17, tw, 1, p.belt);
+      drawOutfitOverlay(ctx, dir, p, tx, tw);
       // Bras
       const la = walk === 1 ? 1 : 0, ra = walk === -1 ? 1 : 0;
-      R(ctx, 3, 12 + la, 2, 4, shirtS); R(ctx, 3, 16 + la, 2, 2, skinS);
-      R(ctx, 13, 12 + ra, 2, 4, shirtS); R(ctx, 13, 16 + ra, 2, 2, skinS);
+      R(ctx, tx - 2, 12 + la, 2, 4, shirtS); R(ctx, tx - 2, 16 + la, 2, 2, skinS);
+      R(ctx, tx + tw, 12 + ra, 2, 4, shirtS); R(ctx, tx + tw, 16 + ra, 2, 2, skinS);
+      R(ctx, tx - 2, 15 + la, 2, 1, p.robe ? shirtS : shirtL);
+      R(ctx, tx + tw, 15 + ra, 2, 1, p.robe ? shirtS : shirtL);
       // Tête (dos)
       R(ctx, 5, 3, 8, 7, skin);
       R(ctx, 5, 3, 1, 5, skinS); R(ctx, 12, 3, 1, 5, skinS);
@@ -556,28 +889,31 @@
       R(ctx, 5, 18, 3, l1, pants); R(ctx, 10, 18, 3, l2, pants);
       R(ctx, 5, 18 + l1 - 1, 3, 2, p.shoes); R(ctx, 10, 18 + l2 - 1, 3, 2, p.shoes);
       R(ctx, 5, 18, 1, 3, pantsS); R(ctx, 10, 18, 1, 3, pantsS);
+      R(ctx, 6, 20, 1, 1, shoeLight); R(ctx, 11, 20, 1, 1, shoeLight);
       if (p.robe) {
-        R(ctx, 4, 17, 10, 4, p.shirtShade);
+        R(ctx, tx - 1, 17, tw + 2, 4, shirtS);
+        R(ctx, tx - 1, 20, tw + 2, 1, U.shade(shirtS, -16));
         R(ctx, 5, 20, 3, 2, p.shoes); R(ctx, 10, 20, 3, 2, p.shoes);
+        R(ctx, 6, 20, 1, 1, shoeLight); R(ctx, 11, 20, 1, 1, shoeLight);
       }
       // Torse
-      R(ctx, 5, 11, 8, 7, shirt);
-      R(ctx, 4, 12, 1, 3, shirtS); R(ctx, 13, 12, 1, 3, shirtS);
-      R(ctx, 5, 11, 2, 6, shirtL);
-      R(ctx, 11, 12, 2, 6, shirtS);
-      R(ctx, 5, 17, 8, 1, p.belt);
-      R(ctx, 9, 17, 1, 1, p.gold);
-      if (p.apron) {
-        R(ctx, 6, 14, 6, 5, '#e8ddc1'); R(ctx, 7, 14, 1, 1, '#cbbf9f');
-      }
-      if (p.armor) {
-        R(ctx, 4, 11, 10, 4, '#9aa4ac'); R(ctx, 5, 12, 8, 1, '#c6d0d6');
-        R(ctx, 3, 11, 2, 2, '#6d7880'); R(ctx, 13, 11, 2, 2, '#6d7880');
-      }
+      R(ctx, tx, 11, tw, 7, shirt);
+      R(ctx, tx - 1, 12, 1, 3, shirtS); R(ctx, tx + tw, 12, 1, 3, shirtS);
+      R(ctx, tx, 11, 2, 6, shirtL);
+      R(ctx, tx + tw - 2, 12, 2, 6, shirtS);
+      R(ctx, tx, 16, tw, 1, p.robe ? shirtS : U.shade(shirt, -12));
+      R(ctx, tx, 17, tw, 1, p.belt);
+      R(ctx, tx + (tw >> 1), 17, 1, 1, p.gold);
+      // Col
+      R(ctx, tx + 1, 11, tw - 2, 1, p.robe ? shirtS : shirtL);
+      R(ctx, tx + (tw >> 1) - 1, 11, 2, 1, skinS);
+      drawOutfitOverlay(ctx, dir, p, tx, tw);
       // Bras
       const la = walk === 1 ? 1 : 0, ra = walk === -1 ? 1 : 0;
-      R(ctx, 3, 12 + la, 2, 4, shirtS); R(ctx, 3, 16 + la, 2, 2, skinS);
-      R(ctx, 13, 12 + ra, 2, 4, shirtS); R(ctx, 13, 16 + ra, 2, 2, skinS);
+      R(ctx, tx - 2, 12 + la, 2, 4, shirtS); R(ctx, tx - 2, 16 + la, 2, 2, skinS);
+      R(ctx, tx + tw, 12 + ra, 2, 4, shirtS); R(ctx, tx + tw, 16 + ra, 2, 2, skinS);
+      R(ctx, tx - 2, 15 + la, 2, 1, p.robe ? shirtS : shirtL);
+      R(ctx, tx + tw, 15 + ra, 2, 1, p.robe ? shirtS : shirtL);
       // Tête
       R(ctx, 5, 3, 8, 7, skin);
       R(ctx, 4, 6, 1, 3, skinS); R(ctx, 13, 6, 1, 3, skinS);
@@ -589,6 +925,8 @@
       R(ctx, 7, 6, 1, 2, eye); R(ctx, 10, 6, 1, 2, eye);
       R(ctx, 7, 6, 1, 1, p.eyeGlow || '#f4f2ea'); R(ctx, 10, 6, 1, 1, p.eyeGlow || '#f4f2ea');
       R(ctx, 8, 8, 2, 1, skinS);
+      drawMarks(ctx, dir, p);
+      drawBeard(ctx, dir, p);
       drawHairFront(ctx, dir, p, frame);
       drawAccessoryFront(ctx, dir, p);
     } else {
@@ -600,18 +938,27 @@
       R(ctx, 7 + (lift > 0 ? -1 : 1), 21, 4, 2, p.shoes);
       R(ctx, 10 - (lift > 0 ? 1 : -1), 21, 4, 2, p.shoes);
       R(ctx, 7, 18, 1, 3, pantsS); R(ctx, 10, 18, 1, 3, pantsS);
+      const ptx = 6 - broad + slim, ptw = 7 + broad - slim;
+      if (p.robe) {
+        R(ctx, ptx - 1, 17, ptw + 2, 4, shirtS);
+        R(ctx, ptx - 1, 20, ptw + 2, 1, U.shade(shirtS, -16));
+        R(ctx, 7, 20, 4, 2, p.shoes); R(ctx, 10, 20, 3, 2, p.shoes);
+      }
+      if (broad) R(ctx, 4, 11, 2, 3, shirt);
       // Torse
-      R(ctx, 6, 11, 7, 7, shirt);
-      R(ctx, 6, 11, 1, 6, shirtL);
-      R(ctx, 11, 12, 2, 6, shirtS);
-      R(ctx, 6, 17, 7, 1, p.belt);
-      R(ctx, 10, 17, 1, 1, p.gold);
-      if (p.apron) R(ctx, 7, 14, 4, 5, '#e8ddc1');
-      if (p.armor) R(ctx, 6, 11, 7, 4, '#9aa4ac');
+      R(ctx, ptx, 11, ptw, 7, shirt);
+      R(ctx, ptx, 11, 1, 6, shirtL);
+      R(ctx, ptx + ptw - 2, 12, 2, 6, shirtS);
+      R(ctx, ptx, 16, ptw, 1, p.robe ? shirtS : U.shade(shirt, -12));
+      R(ctx, ptx, 17, ptw, 1, p.belt);
+      R(ctx, ptx + ptw - 3, 17, 1, 1, p.gold);
+      R(ctx, ptx + 1, 11, ptw - 2, 1, p.robe ? shirtS : shirtL);
+      drawOutfitOverlay(ctx, dir, p, ptx, ptw);
       // Bras avant
       const armY = 12 + (walk > 0 ? 1 : 0);
-      R(ctx, 11, armY, 2, 4, shirtS);
-      R(ctx, 12, armY + 4, 2, 2, skin);
+      R(ctx, ptx + ptw - 2, armY, 2, 4, shirtS);
+      R(ctx, ptx + ptw - 1, armY + 4, 2, 2, skin);
+      R(ctx, ptx + ptw - 2, armY + 3, 2, 1, p.robe ? shirtS : shirtL);
       // Tête
       R(ctx, 5, 3, 9, 7, skin);
       R(ctx, 4, 5, 1, 5, skinS);
@@ -623,6 +970,8 @@
       R(ctx, 11, 6, 1, 2, eye);
       R(ctx, 11, 6, 1, 1, p.eyeGlow || '#f4f2ea');
       R(ctx, 10, 8, 2, 1, skinS);
+      drawMarks(ctx, dir, p);
+      drawBeard(ctx, dir, p);
       drawHairFront(ctx, dir, p, frame);
       drawAccessoryFront(ctx, dir, p);
     }
